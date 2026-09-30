@@ -27,7 +27,8 @@ export async function getRepoInfo(cwd: string): Promise<RepoInfo> {
   const root = await git(cwd, "rev-parse", "--show-toplevel");
   // --verify --quiet exits non-zero with no output on an unborn HEAD
   const head = await git(root, "rev-parse", "--verify", "--quiet", "HEAD").catch(() => null);
-  return { root, head };
+  const reviewer = await tryGit(root, "config", "user.name");
+  return { root, head, reviewer: reviewer || null };
 }
 
 export async function resolveCommit(cwd: string, ref: string): Promise<string> {

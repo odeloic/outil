@@ -241,3 +241,59 @@ describe('buildRows with no hunks', () => {
     expect(buildRows([], [], 0, new Map())).toEqual([])
   })
 })
+
+describe('buildRows mustShow', () => {
+  it('fully reveals a middle gap that contains a required new-side line', () => {
+    const rows = buildRows(hunks, newLines, newCount, new Map(), { old: new Set(), new: new Set([12]) })
+
+    expect(rows.filter(isGap).some((g) => g.index === 1)).toBe(false)
+    const revealed = rows
+      .filter(isLine)
+      .filter((r) => r.newNo !== null && r.newNo >= 9 && r.newNo <= 15)
+      .map((r) => r.newNo)
+    expect(revealed).toEqual([9, 10, 11, 12, 13, 14, 15])
+  })
+
+  it('maps a required old-side line inside a gap to its new-side position using the gap offset', () => {
+    const rows = buildRows(hunks, newLines, newCount, new Map(), { old: new Set([11]), new: new Set() })
+
+    expect(rows.filter(isGap).some((g) => g.index === 1)).toBe(false)
+  })
+
+  it('reveals only enough of the first gap, from the bottom, to show a required line', () => {
+    const rows = buildRows(hunks, newLines, newCount, new Map(), { old: new Set(), new: new Set([3]) })
+
+    const gap = rows.filter(isGap).find((g) => g.index === 0)
+    expect(gap).toEqual({ type: 'gap', index: 0, hidden: 2, canExpandUp: true, canExpandDown: false, header: 'hunk1 header' })
+    const revealed = rows
+      .filter(isLine)
+      .filter((r) => r.newNo !== null && r.newNo <= 4)
+      .map((r) => r.newNo)
+    expect(revealed).toEqual([3, 4])
+  })
+
+  it('reveals only enough of the trailing gap, from the top, to show a required line', () => {
+    const rows = buildRows(hunks, newLines, newCount, new Map(), { old: new Set(), new: new Set([19]) })
+
+    const gap = rows.filter(isGap).find((g) => g.index === 2)
+    expect(gap).toEqual({ type: 'gap', index: 2, hidden: 6, canExpandUp: false, canExpandDown: true, header: '' })
+    const revealed = rows
+      .filter(isLine)
+      .filter((r) => r.newNo !== null && r.newNo >= 18)
+      .map((r) => r.newNo)
+    expect(revealed).toEqual([18, 19])
+  })
+
+  it('leaves gaps untouched when no required line falls inside them', () => {
+    const withoutMustShow = buildRows(hunks, newLines, newCount, new Map())
+    const withEmptyMustShow = buildRows(hunks, newLines, newCount, new Map(), { old: new Set(), new: new Set() })
+    expect(withEmptyMustShow).toEqual(withoutMustShow)
+  })
+
+  it('combines a required reveal with the reviewer-driven expansion of the same gap', () => {
+    const expansions = new Map<number, Expansion>([[1, { fromTop: 1, fromBottom: 0 }]])
+    const rows = buildRows(hunks, newLines, newCount, expansions, { old: new Set(), new: new Set([12]) })
+
+    expect(rows.filter(isGap).some((g) => g.index === 1)).toBe(false)
+  })
+})

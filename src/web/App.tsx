@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ChangeSet } from '../shared/api.ts'
+import type { ChangeSet, ReviewTarget } from '../shared/api.ts'
 import { client, unwrap } from './api.ts'
 import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
@@ -16,6 +16,7 @@ type Loaded = {
   header: ReactNode
   notice: ReactNode
   commits: string[]
+  reviewTarget: ReviewTarget
 }
 
 function parseTarget(search: string): Target {
@@ -42,6 +43,7 @@ async function load(target: Target): Promise<Loaded> {
       params: { ref: commit.sha },
       changes,
       commits: [commit.sha],
+      reviewTarget: { kind: 'commit', sha: commit.sha },
       header: <CommitHeader commit={commit} />,
       notice: commit.parents.length > 1 && (
         <Note>
@@ -56,6 +58,7 @@ async function load(target: Target): Promise<Loaded> {
     params: { base: comparison.base.sha, head: comparison.head.sha },
     changes,
     commits: [comparison.base.sha, comparison.head.sha],
+    reviewTarget: { kind: 'compare', base: comparison.base.sha, head: comparison.head.sha },
     header: <CompareHeader comparison={comparison} />,
     notice: null,
   }
@@ -122,6 +125,7 @@ function App() {
       onCompare={openComparison}
       header={review.header}
       notice={review.notice}
+      reviewTarget={review.reviewTarget}
     />
   )
 }

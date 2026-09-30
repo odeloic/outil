@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
-import type { ChangeSet, FileChange } from '../../shared/api.ts'
-import { DiffStat, FileStatusBadge, ProgressBar, Tag } from '../design-system'
+import type { ChangeSet, FileChange, Thread } from '../../shared/api.ts'
+import { CountBadge, DiffStat, FileStatusBadge, ProgressBar, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import { revealInScrollParent } from './navigation.ts'
 import './FileList.css'
@@ -21,12 +21,14 @@ const FileRow = memo(function FileRow({
   index,
   current,
   viewed,
+  commentCount,
   onSelect,
 }: {
   file: FileChange
   index: number
   current: boolean
   viewed: boolean
+  commentCount: number
   onSelect: (index: number) => void
 }) {
   const ref = useRef<HTMLButtonElement>(null)
@@ -62,6 +64,7 @@ const FileRow = memo(function FileRow({
             <span className="visually-hidden">viewed</span>
           </span>
         )}
+        {commentCount > 0 && <CountBadge count={commentCount} title={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`} />}
         {file.binary ? <Tag>Binary</Tag> : <DiffStat added={file.additions} removed={file.deletions} />}
       </button>
     </li>
@@ -72,10 +75,11 @@ type Props = {
   changes: ChangeSet
   current: number
   viewed: ReadonlySet<string>
+  threadsByPath: ReadonlyMap<string, Thread[]>
   onSelect: (index: number) => void
 }
 
-export function FileList({ changes, current, viewed, onSelect }: Props) {
+export function FileList({ changes, current, viewed, threadsByPath, onSelect }: Props) {
   const count = changes.files.length
   const viewedCount = changes.files.filter((file) => viewed.has(file.path)).length
   return (
@@ -97,6 +101,7 @@ export function FileList({ changes, current, viewed, onSelect }: Props) {
             index={index}
             current={index === current}
             viewed={viewed.has(file.path)}
+            commentCount={threadsByPath.get(file.path)?.length ?? 0}
             onSelect={onSelect}
           />
         ))}

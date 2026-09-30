@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Review, ReviewTarget } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
+import { ReviewError } from "./reviews.ts";
 import { createRoutes, type RouteDeps } from "./routes.ts";
 
 function makeApp(overrides: Partial<RouteDeps>) {
@@ -7,13 +9,17 @@ function makeApp(overrides: Partial<RouteDeps>) {
     throw new Error("not stubbed");
   };
   return createRoutes({
-    repoInfo: async () => ({ root: "/repo", head: null }),
+    repoInfo: async () => ({ root: "/repo", head: null, reviewer: null }),
     resolveCommit: unstubbed,
     getCommit: unstubbed,
     listChanges: unstubbed,
     getFileDiff: unstubbed,
     listCommits: unstubbed,
     compareCommits: unstubbed,
+    getReview: unstubbed,
+    createThread: unstubbed,
+    editDraft: unstubbed,
+    deleteDraft: unstubbed,
     ...overrides,
   });
 }
@@ -250,5 +256,221 @@ describe("GET /api/compare", () => {
     expect(unknown.status).toBe(400);
     expect(await unknown.json()).toEqual({ error: "no such ref", code: "unknown" });
     expect((await app.request("/api/compare?base=main")).status).toBe(400);
+  });
+});
+
+const sha = "a".repeat(40);
+const sha2 = "b".repeat(40);
+
+const emptyReview = (target: ReviewTarget): Review => ({ key: sha, target, base: null, head: sha, threads: [], runs: [], nextThread: 1 });
+
+describe("GET /api/review", () => {
+  it("resolves a commit target", async () => {
+    const calls: ReviewTarget[] = [];
+    const app = makeApp({
+      getReview: async (target) => {
+        calls.push(target);
+        return emptyReview(target);
+      },
+    });
+
+    const res = await app.request(`/api/review?commit=${sha}`);
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([{ kind: "commit", sha }]);
+  });
+
+  it("resolves a base/head compare target", async () => {
+    const calls: ReviewTarget[] = [];
+    const app = makeApp({
+      getReview: async (target) => {
+        calls.push(target);
+        return emptyReview(target);
+      },
+    });
+
+    const res = await app.request(`/api/review?base=${sha}&head=${sha2}`);
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([{ kind: "compare", base: sha, head: sha2 }]);
+  });
+
+  it("rejects a query that is neither a commit nor a full base/head pair", async () => {
+    const app = makeApp({});
+
+    for (const query of ["", `commit=${sha.slice(0, 7)}`, `base=${sha}`, `base=HEAD&head=${sha2}`]) {
+      expect((await app.request(`/api/review?${query}`)).status).toBe(400);
+    }
+  });
+
+  it("reports a ref error as a 400", async () => {
+    const app = makeApp({
+      getReview: async () => {
+        throw new RefError("unknown", "no such commit");
+      },
+    });
+
+    const res = await app.request(`/api/review?commit=${sha}`);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "no such commit", code: "unknown" });
+  });
+});
+
+describe("POST /api/review/threads", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+  const anchor = { path: "src/a.ts", side: "new" as const, startLine: 3, endLine: 5 };
+
+  it("creates a thread with the given anchor and body", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      createThread: async (t, a, body) => {
+        calls.push([t, a, body]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/threads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, anchor, body: "  Please fix this.  " }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, anchor, "Please fix this."]]);
+  });
+
+  it("rejects an invalid target, anchor, or body", async () => {
+    const app = makeApp({});
+    const cases = [
+      { target: { kind: "commit", sha: "short" }, anchor, body: "x" },
+      { target, anchor: { ...anchor, path: "" }, body: "x" },
+      { target, anchor: { ...anchor, path: "a\nb" }, body: "x" },
+      { target, anchor: { ...anchor, side: "both" }, body: "x" },
+      { target, anchor: { ...anchor, startLine: 0 }, body: "x" },
+      { target, anchor: { ...anchor, startLine: 5, endLine: 3 }, body: "x" },
+      { target, anchor, body: "   " },
+      { target, anchor, body: "x".repeat(20001) },
+    ];
+    for (const json of cases) {
+      const res = await app.request("/api/review/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("PATCH /api/review/messages/:id", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("edits a draft message's body", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      editDraft: async (t, id, body) => {
+        calls.push([t, id, body]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/messages/m1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "updated" }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "m1", "updated"]]);
+  });
+
+  it("returns 404 for an unknown message id", async () => {
+    const app = makeApp({
+      editDraft: async () => {
+        throw new ReviewError(404, "No message with id m1.");
+      },
+    });
+
+    const res = await app.request("/api/review/messages/m1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "updated" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 when the message is not a reviewer draft", async () => {
+    const app = makeApp({
+      editDraft: async () => {
+        throw new ReviewError(409, "Only a draft reviewer message can be edited or deleted.");
+      },
+    });
+
+    const res = await app.request("/api/review/messages/m1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "updated" }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects an empty or missing body", async () => {
+    const app = makeApp({});
+
+    for (const json of [{ target }, { target, body: "" }, { target, body: "   " }]) {
+      const res = await app.request("/api/review/messages/m1", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("DELETE /api/review/messages/:id", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("deletes a draft message", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      deleteDraft: async (t, id) => {
+        calls.push([t, id]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/messages/m1", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "m1"]]);
+  });
+
+  it("returns 404 for an unknown message id and 409 for a non-draft message", async () => {
+    const notFound = makeApp({
+      deleteDraft: async () => {
+        throw new ReviewError(404, "No message with id m1.");
+      },
+    });
+    const notDraft = makeApp({
+      deleteDraft: async () => {
+        throw new ReviewError(409, "Only a draft reviewer message can be edited or deleted.");
+      },
+    });
+
+    const body = JSON.stringify({ target });
+    const headers = { "content-type": "application/json" };
+    expect((await notFound.request("/api/review/messages/m1", { method: "DELETE", headers, body })).status).toBe(404);
+    expect((await notDraft.request("/api/review/messages/m1", { method: "DELETE", headers, body })).status).toBe(409);
+  });
+
+  it("rejects a request without a valid target", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/api/review/messages/m1", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
   });
 });

@@ -43,6 +43,32 @@
   display: none;
 }
 
+.review__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-3);
+  padding: var(--ods-space-6);
+  border: 1px solid var(--ods-line);
+  border-radius: var(--ods-radius-lg);
+  background: var(--ods-surface);
+}
+
+.review__summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.review__summary-title {
+  font: var(--ods-weight-semibold) var(--ods-text-sm) var(--ods-font-ui);
+}
+
+.review__summary-text {
+  margin: 0;
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-xs);
+}
+
 .review__main[aria-busy="true"] {
   opacity: 0.6;
   pointer-events: none;

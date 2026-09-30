@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import type { ChangeSet } from '../../shared/api.ts'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { ChangeSet, ReviewTarget, Run, Thread } from '../../shared/api.ts'
+import { draftCount } from '../../shared/review.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Button, Note, Tabs } from '../design-system'
+import { Button, CountBadge, Note, Tabs } from '../design-system'
+import { initials } from '../threads/initials.ts'
 import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
 import { jumpToFile, resetNavigation, useCurrentFile } from './navigation.ts'
+import { useReview } from './useReview.ts'
 import { useViewedFiles } from './viewed.ts'
 import './Review.css'
 
 type RailTab = 'files' | 'history'
+
+const NO_THREADS: Thread[] = []
+const NO_RUNS: Run[] = []
 
 type Props = {
   reviewKey: string
@@ -20,6 +26,7 @@ type Props = {
   selectedCommits: string[]
   onSelectCommit: (sha: string) => void
   onCompare: (base: string, head: string) => void
+  reviewTarget: ReviewTarget
 }
 
 export function Review({
@@ -31,6 +38,7 @@ export function Review({
   selectedCommits,
   onSelectCommit,
   onCompare,
+  reviewTarget,
 }: Props) {
   const [viewed, setViewed] = useViewedFiles(reviewKey)
   const [overrides, setOverrides] = useState<{ key: string; map: ReadonlyMap<string, boolean> }>({
@@ -41,6 +49,19 @@ export function Review({
   const collapsedOverrides = overrides.key === reviewKey ? overrides.map : new Map<string, boolean>()
   const [railTab, setRailTab] = useState<RailTab>('files')
   const current = useCurrentFile(changes.files.length)
+  const { review, error, reviewer, createThread, editDraft, deleteDraft } = useReview(reviewTarget)
+  const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
+  const threadsByPath = useMemo(() => {
+    const map = new Map<string, Thread[]>()
+    for (const thread of review?.threads ?? []) {
+      const list = map.get(thread.anchor.path)
+      if (list) list.push(thread)
+      else map.set(thread.anchor.path, [thread])
+    }
+    return map
+  }, [review])
+  const drafts = review ? draftCount(review) : 0
+  const runs = review?.runs ?? NO_RUNS
 
   useEffect(() => resetNavigation, [reviewKey])
 
@@ -69,6 +90,14 @@ export function Review({
       {header}
       <div className="review">
         <aside className="review__rail">
+          <div className="review__summary">
+            <div className="review__summary-header">
+              <span className="review__summary-title">Review</span>
+              <CountBadge count={drafts} />
+            </div>
+            <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
+            {error && <Note variant="failure">{error}</Note>}
+          </div>
           <Tabs<RailTab>
             tabs={[
               { key: 'files', label: 'Files', count: changes.files.length },
@@ -78,7 +107,7 @@ export function Review({
             onChange={setRailTab}
           />
           <div className="review__panel" role="tabpanel" aria-label="Files" hidden={railTab !== 'files'}>
-            <FileList changes={changes} current={current} viewed={viewed} onSelect={jumpToFile} />
+            <FileList changes={changes} current={current} viewed={viewed} threadsByPath={threadsByPath} onSelect={jumpToFile} />
           </div>
           <div className="review__panel" role="tabpanel" aria-label="History" hidden={railTab !== 'history'}>
             <HistoryList selected={selectedCommits} onSelect={onSelectCommit} onCompare={onCompare} />
@@ -98,18 +127,27 @@ export function Review({
           </div>
           {notice}
           {changes.files.length === 0 && <Note variant="hint">There are no changes to show.</Note>}
-          {changes.files.map((file, index) => (
-            <FileDiffView
-              key={`${reviewKey}:${file.path}`}
-              index={index}
-              range={changes}
-              file={file}
-              collapsed={collapsedOverrides.get(file.path) ?? viewed.has(file.path)}
-              viewed={viewed.has(file.path)}
-              onCollapse={setCollapsed}
-              onViewed={markViewed}
-            />
-          ))}
+          {changes.files.map((file, index) => {
+            const fileThreads = threadsByPath.get(file.path) ?? NO_THREADS
+            return (
+              <FileDiffView
+                key={`${reviewKey}:${file.path}`}
+                index={index}
+                range={changes}
+                file={file}
+                collapsed={collapsedOverrides.get(file.path) ?? viewed.has(file.path)}
+                viewed={viewed.has(file.path)}
+                onCollapse={setCollapsed}
+                onViewed={markViewed}
+                threads={fileThreads}
+                runs={fileThreads.length > 0 ? runs : NO_RUNS}
+                reviewerInitials={reviewerInitials}
+                onCreateThread={createThread}
+                onEditDraft={editDraft}
+                onDeleteDraft={deleteDraft}
+              />
+            )
+          })}
         </main>
       </div>
     </>

@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import type { FileChange, FileDiff } from '../../shared/api.ts'
+import type { FileChange, FileDiff, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { client, unwrap } from '../api.ts'
-import { Button, Checkbox, DiffStat, FileStatusBadge, Spinner, Tag } from '../design-system'
+import { Button, Checkbox, CountBadge, DiffStat, FileStatusBadge, Spinner, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import { fileAnchor } from '../review/navigation.ts'
 import { BodyNote } from './BodyNote.tsx'
@@ -12,11 +12,30 @@ import './syntax.css'
 
 type Range = { base: string | null; head: string }
 
+type CommentProps = {
+  threads: Thread[]
+  runs: Run[]
+  reviewerInitials: string
+  onCreateThread: (anchor: ThreadAnchor, body: string) => Promise<unknown>
+  onEditDraft: (id: string, body: string) => Promise<unknown>
+  onDeleteDraft: (id: string) => Promise<unknown>
+}
+
 function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`
 }
 
-function FileBody({ range, file, placeholderLines }: { range: Range; file: FileChange; placeholderLines: number }) {
+function FileBody({
+  range,
+  file,
+  placeholderLines,
+  threads,
+  runs,
+  reviewerInitials,
+  onCreateThread,
+  onEditDraft,
+  onDeleteDraft,
+}: { range: Range; file: FileChange; placeholderLines: number } & CommentProps) {
   const [diff, setDiff] = useState<FileDiff | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [full, setFull] = useState(false)
@@ -66,7 +85,18 @@ function FileBody({ range, file, placeholderLines }: { range: Range; file: FileC
       </BodyNote>
     )
   }
-  return <TextDiff path={file.path} diff={diff} />
+  return (
+    <TextDiff
+      path={file.path}
+      diff={diff}
+      threads={threads}
+      runs={runs}
+      reviewerInitials={reviewerInitials}
+      onCreateThread={onCreateThread}
+      onEditDraft={onEditDraft}
+      onDeleteDraft={onDeleteDraft}
+    />
+  )
 }
 
 type FileDiffViewProps = {
@@ -77,7 +107,7 @@ type FileDiffViewProps = {
   viewed: boolean
   onCollapse: (path: string, collapsed: boolean) => void
   onViewed: (path: string, viewed: boolean) => void
-}
+} & CommentProps
 
 export const FileDiffView = memo(function FileDiffView({
   index,
@@ -87,6 +117,12 @@ export const FileDiffView = memo(function FileDiffView({
   viewed,
   onCollapse,
   onViewed,
+  threads,
+  runs,
+  reviewerInitials,
+  onCreateThread,
+  onEditDraft,
+  onDeleteDraft,
 }: FileDiffViewProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const nearby = useInView(bodyRef, '1200px 0px')
@@ -123,6 +159,7 @@ export const FileDiffView = memo(function FileDiffView({
           {file.path}
         </span>
         {file.binary ? <Tag>Binary</Tag> : <DiffStat added={file.additions} removed={file.deletions} />}
+        {threads.length > 0 && <CountBadge count={threads.length} title={`${threads.length} ${threads.length === 1 ? 'comment' : 'comments'}`} />}
         <Checkbox label="Viewed" checked={viewed} onChange={(event) => onViewed(file.path, event.target.checked)} />
       </header>
       <div
@@ -132,7 +169,19 @@ export const FileDiffView = memo(function FileDiffView({
         hidden={collapsed}
         style={nearby || collapsed ? undefined : { minHeight: `calc(${estimatedLines} * var(--diff-line-height))` }}
       >
-        {nearby && <FileBody range={range} file={file} placeholderLines={estimatedLines} />}
+        {nearby && (
+          <FileBody
+            range={range}
+            file={file}
+            placeholderLines={estimatedLines}
+            threads={threads}
+            runs={runs}
+            reviewerInitials={reviewerInitials}
+            onCreateThread={onCreateThread}
+            onEditDraft={onEditDraft}
+            onDeleteDraft={onDeleteDraft}
+          />
+        )}
       </div>
     </section>
   )

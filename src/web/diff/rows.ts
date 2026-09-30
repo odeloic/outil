@@ -21,6 +21,8 @@ export type Row = LineRow | GapRow
 
 export type Expansion = { fromTop: number; fromBottom: number }
 
+export type MustShow = { old: ReadonlySet<number>; new: ReadonlySet<number> }
+
 export const EXPAND_STEP = 20
 
 export function splitLines(text: string | null): string[] {
@@ -34,11 +36,38 @@ function firstLine(start: number, count: number): number {
   return count === 0 ? start + 1 : start
 }
 
+function gapHasRequiredLine(mustShow: MustShow | undefined, start: number, end: number, offset: number): boolean {
+  if (!mustShow) return false
+  for (let newNo = start; newNo <= end; newNo++) {
+    if (mustShow.new.has(newNo) || mustShow.old.has(newNo + offset)) return true
+  }
+  return false
+}
+
+function neededFromTop(mustShow: MustShow | undefined, start: number, end: number, offset: number): number {
+  if (!mustShow) return 0
+  let need = 0
+  for (let newNo = start; newNo <= end; newNo++) {
+    if (mustShow.new.has(newNo) || mustShow.old.has(newNo + offset)) need = newNo - start + 1
+  }
+  return need
+}
+
+function neededFromBottom(mustShow: MustShow | undefined, start: number, end: number, offset: number): number {
+  if (!mustShow) return 0
+  let need = 0
+  for (let newNo = end; newNo >= start; newNo--) {
+    if (mustShow.new.has(newNo) || mustShow.old.has(newNo + offset)) need = end - newNo + 1
+  }
+  return need
+}
+
 export function buildRows(
   hunks: Hunk[],
   newLines: string[],
   newCount: number,
   expansions: ReadonlyMap<number, Expansion>,
+  mustShow?: MustShow,
 ): Row[] {
   const rows: Row[] = []
   let oldNext = 1
@@ -50,8 +79,21 @@ export function buildRows(
     const isFirst = index === 0
     const isLast = index === hunks.length
     const { fromTop, fromBottom } = expansions.get(index) ?? { fromTop: 0, fromBottom: 0 }
-    const top = isFirst ? 0 : Math.min(fromTop, size)
-    const bottom = isLast ? 0 : Math.min(fromBottom, size - top)
+    let top: number
+    let bottom: number
+    if (isFirst) {
+      top = 0
+      bottom = Math.min(Math.max(fromBottom, neededFromBottom(mustShow, newNext, gapNewEnd, offset)), size)
+    } else if (isLast) {
+      top = Math.min(Math.max(fromTop, neededFromTop(mustShow, newNext, gapNewEnd, offset)), size)
+      bottom = 0
+    } else if (gapHasRequiredLine(mustShow, newNext, gapNewEnd, offset)) {
+      top = size
+      bottom = 0
+    } else {
+      top = Math.min(fromTop, size)
+      bottom = Math.min(fromBottom, size - top)
+    }
     const context = (newNo: number): LineRow => ({
       type: 'line',
       kind: 'context',

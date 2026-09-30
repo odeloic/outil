@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { compareCommits, getCommit, listChanges, listCommits, resolveCommit } from "./git.ts";
+import { compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -32,6 +32,25 @@ async function refError(promise: Promise<unknown>): Promise<RefError> {
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe("getRepoInfo", () => {
+  it("reports the repo root, head, and the configured reviewer name", async () => {
+    const { dir, git, commit } = makeRepo();
+    git("config", "user.name", "Ada Lovelace");
+    const head = commit("one");
+
+    const info = await getRepoInfo(dir);
+    expect(info.root).toBe(execFileSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim());
+    expect(info.head).toBe(head);
+    expect(info.reviewer).toBe("Ada Lovelace");
+  });
+
+  it("reports a null head for a repository with no commits yet", async () => {
+    const { dir } = makeRepo();
+
+    expect((await getRepoInfo(dir)).head).toBeNull();
+  });
 });
 
 describe("resolveCommit", () => {

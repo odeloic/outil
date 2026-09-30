@@ -80,7 +80,6 @@ export function TextDiff({ path, diff }: { path: string; diff: Extract<FileDiff,
 
   const style = {
     '--diff-num-digits': numberDigits,
-    '--diff-chunk-rows': RENDER_STEP,
     '--diff-tab-width': TAB_WIDTH,
   } as CSSProperties
   const visibleChunks = chunks.slice(0, rendered)

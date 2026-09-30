@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { FileChange, FileDiff } from '../../shared/api.ts'
 import { client, unwrap } from '../api.ts'
-import { Button, DiffStat, FileStatusBadge, Spinner, Tag } from '../design-system'
+import { Button, Checkbox, DiffStat, FileStatusBadge, Spinner, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
+import { fileAnchor } from '../review/navigation.ts'
 import { BodyNote } from './BodyNote.tsx'
 import { TextDiff } from './TextDiff.tsx'
 import { useInView } from './useInView.ts'
@@ -15,7 +16,7 @@ function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`
 }
 
-function FileBody({ range, file }: { range: Range; file: FileChange }) {
+function FileBody({ range, file, placeholderLines }: { range: Range; file: FileChange; placeholderLines: number }) {
   const [diff, setDiff] = useState<FileDiff | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [full, setFull] = useState(false)
@@ -42,7 +43,7 @@ function FileBody({ range, file }: { range: Range; file: FileChange }) {
   if (error) return <BodyNote variant="failure">{error}</BodyNote>
   if (!diff) {
     return (
-      <p className="file-diff__loading">
+      <p className="file-diff__loading" style={{ minHeight: `calc(${placeholderLines} * var(--diff-line-height))` }}>
         <Spinner /> Loading diff…
       </p>
     )
@@ -68,14 +69,49 @@ function FileBody({ range, file }: { range: Range; file: FileChange }) {
   return <TextDiff path={file.path} diff={diff} />
 }
 
-export const FileDiffView = memo(function FileDiffView({ range, file }: { range: Range; file: FileChange }) {
-  const ref = useRef<HTMLElement>(null)
-  const visible = useInView(ref, '1200px 0px')
+type FileDiffViewProps = {
+  index: number
+  range: Range
+  file: FileChange
+  collapsed: boolean
+  viewed: boolean
+  onCollapse: (path: string, collapsed: boolean) => void
+  onViewed: (path: string, viewed: boolean) => void
+}
+
+export const FileDiffView = memo(function FileDiffView({
+  index,
+  range,
+  file,
+  collapsed,
+  viewed,
+  onCollapse,
+  onViewed,
+}: FileDiffViewProps) {
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const nearby = useInView(bodyRef, '1200px 0px')
   const estimatedLines = Math.min(file.additions + file.deletions + 6, 60)
+  const bodyId = `${fileAnchor(index)}-body`
 
   return (
-    <section ref={ref} className="file-diff" aria-label={file.path}>
+    <section
+      id={fileAnchor(index)}
+      data-file-index={index}
+      tabIndex={-1}
+      className="file-diff"
+      aria-label={file.path}
+    >
       <header className="file-diff__header">
+        <Button
+          variant="ghost"
+          className="file-diff__toggle"
+          aria-expanded={!collapsed}
+          aria-controls={bodyId}
+          aria-label={collapsed ? `Expand ${file.path}` : `Collapse ${file.path}`}
+          onClick={() => onCollapse(file.path, !collapsed)}
+        >
+          <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+        </Button>
         <FileStatusBadge status={FILE_STATUS_BADGE[file.status]} />
         <span className="file-diff__path">
           {file.oldPath && (
@@ -87,9 +123,16 @@ export const FileDiffView = memo(function FileDiffView({ range, file }: { range:
           {file.path}
         </span>
         {file.binary ? <Tag>Binary</Tag> : <DiffStat added={file.additions} removed={file.deletions} />}
+        <Checkbox label="Viewed" checked={viewed} onChange={(event) => onViewed(file.path, event.target.checked)} />
       </header>
-      <div className="file-diff__body" style={visible ? undefined : { minHeight: `calc(${estimatedLines} * var(--diff-line-height))` }}>
-        {visible && <FileBody range={range} file={file} />}
+      <div
+        ref={bodyRef}
+        id={bodyId}
+        className="file-diff__body"
+        hidden={collapsed}
+        style={nearby || collapsed ? undefined : { minHeight: `calc(${estimatedLines} * var(--diff-line-height))` }}
+      >
+        {nearby && <FileBody range={range} file={file} placeholderLines={estimatedLines} />}
       </div>
     </section>
   )

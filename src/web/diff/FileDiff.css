@@ -13,9 +13,22 @@
   display: flex;
   align-items: center;
   gap: var(--ods-space-5);
-  padding: var(--ods-space-5) var(--ods-space-8);
+  padding: var(--ods-space-5) var(--ods-space-8) var(--ods-space-5) var(--ods-space-4);
   background: var(--ods-surface);
   border-bottom: 1px solid var(--ods-line);
+  margin-bottom: -1px;
+}
+
+.file-diff:focus {
+  outline: none;
+}
+
+.file-diff__toggle {
+  padding: 0 var(--ods-space-2);
+}
+
+.file-diff__body[hidden] {
+  display: none;
 }
 
 .file-diff__path {
@@ -30,8 +43,9 @@
 }
 
 .file-diff__loading {
+  box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--ods-space-5);
   padding: var(--ods-space-8);
   color: var(--ods-fg-2);
@@ -153,7 +167,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
 
 .diff__gap {
   background: var(--ods-sunken);

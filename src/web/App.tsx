@@ -3,11 +3,8 @@ import type { ChangeSet, CommitDetails } from '../shared/api.ts'
 import { client, unwrap } from './api.ts'
 import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
-import { FileDiffView } from './diff/FileDiffView.tsx'
 import { CommitHeader } from './review/CommitHeader.tsx'
-import { DisplayOptions } from './review/DisplayOptions.tsx'
-import { FileList } from './review/FileList.tsx'
-import './review/Review.css'
+import { Review } from './review/Review.tsx'
 
 type Loaded = { commit: CommitDetails; changes: ChangeSet }
 
@@ -47,26 +44,20 @@ function App() {
 
   const { commit, changes } = review
   return (
-    <>
-      <CommitHeader commit={commit} />
-      <div className="review">
-        <aside className="review__rail">
-          <FileList changes={changes} />
-        </aside>
-        <main className="review__main">
-          <DisplayOptions />
-          {commit.parents.length > 1 && (
-            <Note>
-              This is a merge commit. Changes are shown against its first parent,{' '}
-              <code>{shortSha(commit.parents[0])}</code>.
-            </Note>
-          )}
-          {changes.files.map((file) => (
-            <FileDiffView key={file.path} range={changes} file={file} />
-          ))}
-        </main>
-      </div>
-    </>
+    <Review
+      key={commit.sha}
+      reviewKey={commit.sha}
+      changes={changes}
+      header={<CommitHeader commit={commit} />}
+      notice={
+        commit.parents.length > 1 && (
+          <Note>
+            This is a merge commit. Changes are shown against its first parent,{' '}
+            <code>{shortSha(commit.parents[0])}</code>.
+          </Note>
+        )
+      }
+    />
   )
 }
 

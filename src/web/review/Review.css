@@ -22,3 +22,16 @@
   padding: var(--ods-space-10) var(--ods-space-12);
   min-width: 0;
 }
+
+.review__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ods-space-5);
+}
+
+.review__toolbar-actions {
+  display: flex;
+  gap: var(--ods-space-2);
+}

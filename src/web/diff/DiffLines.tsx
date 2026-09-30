@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, type CSSProperties } from 'react'
 import { Button } from '../design-system'
 import type { Token } from './highlight.ts'
 import { EXPAND_STEP, type Expansion, type GapRow, type LineRow } from './rows.ts'
@@ -137,7 +137,7 @@ export const Chunk = memo(function Chunk({
   onExpand: ExpandGap
 }) {
   return (
-    <div className="diff__chunk">
+    <div className="diff__chunk" style={{ '--diff-chunk-rows': rows.length } as CSSProperties}>
       {rows.map((row) => {
         if (row.type === 'gap') return <Gap key={`gap-${row.index}`} row={row} onExpand={onExpand} />
         if (row.type === 'split') {
@@ -181,7 +181,7 @@ export const PaneChunk = memo(function PaneChunk({
   onExpand: ExpandGap
 }) {
   return (
-    <div className="diff__chunk">
+    <div className="diff__chunk" style={{ '--diff-chunk-rows': rows.length } as CSSProperties}>
       {rows.map((row, i) => {
         if (row.type === 'gap') {
           return <Gap key={`gap-${row.index}`} row={row} onExpand={onExpand} mirror={pane === 'right'} />

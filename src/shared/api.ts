@@ -97,3 +97,17 @@ export type ApiError = {
   error: string
   code?: RefErrorCode
 }
+
+export type AgentId = 'claude' | 'codex'
+
+export type AgentStatus = {
+  id: AgentId
+  name: string
+  state: 'not-installed' | 'signed-out' | 'ready'
+  fix: string | null
+}
+
+export type AgentModel = {
+  id: string
+  label: string
+}

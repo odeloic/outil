@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import { stopAllRuns } from "./agents/run.ts";
 import { parseCli, USAGE, UsageError } from "./args.ts";
 import { createApp } from "./createApp.ts";
 import { RefError } from "./errors.ts";
@@ -70,6 +71,7 @@ function start(root: string, preferredPort: number, params: Record<string, strin
 function stopOnSignal(server: Server) {
   const stop = () => {
     console.log("\nStopped.");
+    stopAllRuns();
     server.close(() => process.exit(0));
     server.closeAllConnections();
     setTimeout(() => process.exit(0), 2000).unref();

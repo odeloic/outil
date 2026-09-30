@@ -1,5 +1,5 @@
 {
-  "name": "@outil/review",
+  "name": "@odeloic/review",
   "version": "0.1.0",
   "description": "Agentic coding review tool.",
   "license": "MIT",
@@ -20,6 +20,7 @@
     "access": "public"
   },
   "type": "module",
+  "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=24"
   },

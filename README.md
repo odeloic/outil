@@ -3,7 +3,7 @@
 Agentic coding review tool.
 
 ```
-npx @outil/review
+npx @odeloic/review
 ```
 
 Documentation is still in progress.

@@ -32,6 +32,7 @@
   ],
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc -b",
     "build": "tsc -b && vite build && vite build --ssr src/server/cli.ts --outDir dist/server",
     "lint": "eslint .",
     "start": "node dist/server/cli.js"

@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
-import type { ApiError, RepoInfo } from '../shared/api.ts'
+import { hc } from 'hono/client'
+import type { AppType } from '../server/routes.ts'
+import type { RepoInfo } from '../shared/api.ts'
 import './App.css'
+
+const client = hc<AppType>('/')
 
 function App() {
   const [repo, setRepo] = useState<RepoInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/repo')
+    client.api.repo.$get()
       .then(async (res) => {
-        const body: RepoInfo | ApiError = await res.json()
+        const body = await res.json()
         if ('error' in body) throw new Error(body.error)
         setRepo(body)
       })

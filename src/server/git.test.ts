@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { getCommit, listChanges, resolveCommit } from "./git.ts";
+import { getCommit, listChanges, listCommits, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -272,5 +272,74 @@ describe("listChanges", () => {
 
     const changes = await listChanges(dir, main, merge);
     expect(changes.files.map((f) => [f.path, f.status])).toEqual([["side.txt", "added"]]);
+  });
+});
+
+describe("listCommits", () => {
+  function history(authors: string[]) {
+    const repo = makeRepo();
+    const shas = authors.map((author, i) => {
+      writeFileSync(join(repo.dir, "file.txt"), String(i));
+      repo.git("add", "file.txt");
+      repo.git("-c", `user.name=${author}`, "commit", "-q", "-m", `Change ${i}`, "-m", `Body mentions topic-${i % 2}`);
+      return repo.git("rev-parse", "HEAD");
+    });
+    return { ...repo, shas };
+  }
+
+  const all = { skip: 0, limit: 50, message: "", author: "" };
+
+  it("lists commits newest first with their summary", async () => {
+    const { dir, shas } = history(["Ada", "Grace"]);
+
+    const page = await listCommits(dir, all);
+    expect(page.hasMore).toBe(false);
+    expect(page.commits.map((c) => [c.sha, c.subject, c.author.name])).toEqual([
+      [shas[1], "Change 1", "Grace"],
+      [shas[0], "Change 0", "Ada"],
+    ]);
+    expect(page.commits[0].parents).toEqual([shas[0]]);
+    expect(page.commits[1].parents).toEqual([]);
+    expect(Date.parse(page.commits[0].date)).not.toBeNaN();
+  });
+
+  it("pages through long histories", async () => {
+    const { dir, shas } = history(["a", "b", "c", "d", "e"]);
+
+    const first = await listCommits(dir, { ...all, limit: 2 });
+    const last = await listCommits(dir, { ...all, skip: 4, limit: 2 });
+    expect(first.commits.map((c) => c.sha)).toEqual([shas[4], shas[3]]);
+    expect(first.hasMore).toBe(true);
+    expect(last.commits.map((c) => c.sha)).toEqual([shas[0]]);
+    expect(last.hasMore).toBe(false);
+  });
+
+  it("filters by message text and author, case-insensitively and literally", async () => {
+    const { dir } = history(["Ada Lovelace", "Grace Hopper", "Ada Lovelace", "Grace Hopper"]);
+
+    const subjects = async (message: string, author: string) =>
+      (await listCommits(dir, { ...all, message, author })).commits.map((c) => c.subject);
+    expect(await subjects("", "grace")).toEqual(["Change 3", "Change 1"]);
+    expect(await subjects("TOPIC-0", "")).toEqual(["Change 2", "Change 0"]);
+    expect(await subjects("topic-0", "ada")).toEqual(["Change 2", "Change 0"]);
+    expect(await subjects("topic-0", "grace")).toEqual([]);
+    expect(await subjects("change .", "")).toEqual([]);
+  });
+
+  it("keeps commits apart whatever characters their subjects contain", async () => {
+    const { dir, git, commit } = makeRepo();
+    commit("plain");
+    writeFileSync(join(dir, "file.txt"), "odd");
+    git("add", "file.txt");
+    git("commit", "-q", "-m", "odd \u001e subject");
+
+    const page = await listCommits(dir, all);
+    expect(page.commits.map((c) => c.subject)).toEqual(["odd \u001e subject", "plain"]);
+  });
+
+  it("returns an empty history for a repository without commits", async () => {
+    const { dir } = makeRepo();
+
+    expect(await listCommits(dir, all)).toEqual({ commits: [], hasMore: false });
   });
 });

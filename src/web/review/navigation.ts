@@ -88,6 +88,11 @@ function loadingJustAbove(target: HTMLElement): boolean {
 
 let activeJump = 0
 
+export function resetNavigation() {
+  activeJump++
+  setPinned(null)
+}
+
 export function jumpToFile(index: number) {
   const target = document.getElementById(fileAnchor(index))
   if (!target) return

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CommitDetails } from '../../shared/api.ts'
 import { Button, Tag } from '../design-system'
 import { shortSha } from '../format.ts'
+import { navigate } from '../router.ts'
 import './CommitHeader.css'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -38,7 +39,16 @@ function Parents({ parents }: { parents: string[] }) {
       {parents.length > 1 ? 'Merge of' : 'Parent'}
       {parents.map((parent, i) => (
         <span key={parent}>
-          <a className="commit-header__sha" href={`?ref=${parent}`} title={parent}>
+          <a
+            className="commit-header__sha"
+            href={`?ref=${parent}`}
+            title={parent}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+              event.preventDefault()
+              navigate({ ref: parent })
+            }}
+          >
             {shortSha(parent)}
           </a>
           {i < parents.length - 2 && ','}

@@ -10,7 +10,10 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  padding: var(--ods-space-10) var(--ods-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-8);
+  padding: var(--ods-space-8);
   border-right: 1px solid var(--ods-line);
   box-sizing: border-box;
 }
@@ -34,4 +37,13 @@
 .review__toolbar-actions {
   display: flex;
   gap: var(--ods-space-2);
+}
+
+.review__panel[hidden] {
+  display: none;
+}
+
+.review__main[aria-busy="true"] {
+  opacity: 0.6;
+  pointer-events: none;
 }

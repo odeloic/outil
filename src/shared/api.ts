@@ -37,6 +37,26 @@ export type ChangeSet = {
   deletions: number
 }
 
+export type CommitSummary = {
+  sha: string
+  parents: string[]
+  author: { name: string; email: string }
+  date: string
+  subject: string
+}
+
+export type HistoryPage = {
+  commits: CommitSummary[]
+  hasMore: boolean
+}
+
+export type HistoryQuery = {
+  skip: number
+  limit: number
+  message: string
+  author: string
+}
+
 export type HunkLine = {
   kind: "context" | "add" | "del"
   text: string

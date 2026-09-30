@@ -1,6 +1,16 @@
 import { Hono } from "hono";
 import { validator } from "hono/validator";
-import type { ApiError, ChangeSet, CommitDetails, FileDiff, FileDiffRequest, RepoInfo, ResolvedCommit } from "../shared/api.ts";
+import type {
+  ApiError,
+  ChangeSet,
+  CommitDetails,
+  FileDiff,
+  FileDiffRequest,
+  HistoryPage,
+  HistoryQuery,
+  RepoInfo,
+  ResolvedCommit,
+} from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 
 export type RouteDeps = {
@@ -9,6 +19,7 @@ export type RouteDeps = {
   getCommit: (sha: string) => Promise<CommitDetails>;
   listChanges: (base: string | null, head: string) => Promise<ChangeSet>;
   getFileDiff: (request: FileDiffRequest) => Promise<FileDiff>;
+  listCommits: (query: HistoryQuery) => Promise<HistoryPage>;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -43,11 +54,38 @@ const fileQuery = validator("query", (query, c): (Range & { path: string; oldPat
   return { ...range, path, ...(oldPath ? { oldPath } : {}), ...(full === "1" ? { full } : {}) };
 });
 
+export const MAX_HISTORY_PAGE = 200;
+
+function count(value: unknown, fallback: number, max: number): number | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !/^\d{1,9}$/.test(value)) return null;
+  return Math.min(Number(value), max);
+}
+
+const historyQuery = validator(
+  "query",
+  (query, c): { skip?: string; limit?: string; message?: string; author?: string } | Response => {
+    const { skip, limit, message, author } = query;
+    const valid =
+      count(skip, 0, Number.MAX_SAFE_INTEGER) !== null &&
+      count(limit, 50, MAX_HISTORY_PAGE) !== null &&
+      (message === undefined || typeof message === "string") &&
+      (author === undefined || typeof author === "string");
+    if (!valid) return c.json({ error: "Invalid history query." } satisfies ApiError, 400);
+    return {
+      ...(typeof skip === "string" ? { skip } : {}),
+      ...(typeof limit === "string" ? { limit } : {}),
+      ...(typeof message === "string" ? { message } : {}),
+      ...(typeof author === "string" ? { author } : {}),
+    };
+  },
+);
+
 function refFailure(err: unknown) {
   return [toApiError(err), err instanceof RefError ? 400 : 500] as const;
 }
 
-export function createRoutes({ repoInfo, resolveCommit, getCommit, listChanges, getFileDiff }: RouteDeps) {
+export function createRoutes({ repoInfo, resolveCommit, getCommit, listChanges, getFileDiff, listCommits }: RouteDeps) {
   return new Hono()
     .get("/api/repo", async (c) => {
       try {
@@ -87,6 +125,20 @@ export function createRoutes({ repoInfo, resolveCommit, getCommit, listChanges, 
         return c.json(await getFileDiff({ base: base ?? null, head, path, oldPath: oldPath ?? null, full: full === "1" }), 200);
       } catch (err) {
         return c.json(...refFailure(err));
+      }
+    })
+    .get("/api/history", historyQuery, async (c) => {
+      const query = c.req.valid("query");
+      try {
+        const page = await listCommits({
+          skip: count(query.skip, 0, Number.MAX_SAFE_INTEGER) ?? 0,
+          limit: Math.max(1, count(query.limit, 50, MAX_HISTORY_PAGE) ?? 50),
+          message: query.message?.trim() ?? "",
+          author: query.author?.trim() ?? "",
+        });
+        return c.json(page, 200);
+      } catch (err) {
+        return c.json(toApiError(err), 500);
       }
     });
 }

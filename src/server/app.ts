@@ -1,5 +1,5 @@
 import { getFileDiff } from "./diff.ts";
-import { getCommit, getRepoInfo, listChanges, resolveCommit } from "./git.ts";
+import { getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
 
 export default createRoutes({
@@ -8,4 +8,5 @@ export default createRoutes({
   getCommit: (sha) => getCommit(process.cwd(), sha),
   listChanges: (base, head) => listChanges(process.cwd(), base, head),
   getFileDiff: (request) => getFileDiff(process.cwd(), request),
+  listCommits: (query) => listCommits(process.cwd(), query),
 });

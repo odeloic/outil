@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeSet, CommitDetails } from '../shared/api.ts'
 import { client, unwrap } from './api.ts'
 import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
 import { CommitHeader } from './review/CommitHeader.tsx'
 import { Review } from './review/Review.tsx'
+import { navigate, useSearch } from './router.ts'
 
 type Loaded = { commit: CommitDetails; changes: ChangeSet }
 
@@ -16,21 +17,41 @@ async function load(ref: string): Promise<Loaded> {
   return { commit, changes }
 }
 
+function openCommit(sha: string) {
+  navigate({ ref: sha })
+}
+
 function App() {
+  const ref = new URLSearchParams(useSearch()).get('ref') ?? 'HEAD'
   const [review, setReview] = useState<Loaded | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ ref: string; message: string } | null>(null)
+  const loadedSha = useRef<string | null>(null)
+  const pending = review !== null && ref !== review.commit.sha && error?.ref !== ref
 
   useEffect(() => {
-    const ref = new URLSearchParams(window.location.search).get('ref') ?? 'HEAD'
+    if (ref === loadedSha.current) return
+    let cancelled = false
     load(ref)
-      .then(setReview)
-      .catch((err: Error) => setError(err.message))
-  }, [])
+      .then((loaded) => {
+        if (cancelled) return
+        loadedSha.current = loaded.commit.sha
+        setReview(loaded)
+        setError(null)
+        window.scrollTo(0, 0)
+        if (ref !== loaded.commit.sha) navigate({ ref: loaded.commit.sha }, { replace: true })
+      })
+      .catch((err: Error) => !cancelled && setError({ ref, message: err.message }))
+    return () => {
+      cancelled = true
+    }
+  }, [ref])
 
-  if (error) {
+  if (error?.ref === ref) {
     return (
       <div className="app-status">
-        <Note variant="failure">{error}</Note>
+        <Note variant="failure" action={<a href="?">Open the latest commit</a>}>
+          {error.message}
+        </Note>
       </div>
     )
   }
@@ -45,9 +66,11 @@ function App() {
   const { commit, changes } = review
   return (
     <Review
-      key={commit.sha}
       reviewKey={commit.sha}
       changes={changes}
+      pending={pending}
+      selectedCommit={commit.sha}
+      onSelectCommit={openCommit}
       header={<CommitHeader commit={commit} />}
       notice={
         commit.parents.length > 1 && (

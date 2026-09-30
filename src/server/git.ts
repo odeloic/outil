@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ChangeSet, CommitDetails, FileChange, FileChangeStatus, RepoInfo } from "../shared/api.ts";
+import type { ChangeSet, CommitDetails, FileChange, FileChangeStatus, HistoryPage, HistoryQuery, RepoInfo } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 
 const exec = promisify(execFile);
@@ -133,4 +133,37 @@ export async function listChanges(cwd: string, base: string | null, head: string
     additions: files.reduce((sum, f) => sum + f.additions, 0),
     deletions: files.reduce((sum, f) => sum + f.deletions, 0),
   };
+}
+
+export async function listCommits(cwd: string, { skip, limit, message, author }: HistoryQuery): Promise<HistoryPage> {
+  if ((await tryGit(cwd, "rev-parse", "--verify", "--quiet", "HEAD")) === null) return { commits: [], hasMore: false };
+  const fields = ["%H", "%P", "%an", "%ae", "%aI", "%s"];
+  const filters = [
+    ...(message ? [`--grep=${message}`] : []),
+    ...(author ? [`--author=${author}`] : []),
+  ];
+  const { stdout } = await exec(
+    "git",
+    [
+      "log",
+      "--no-show-signature",
+      "-z",
+      `--format=${fields.join("%x00")}`,
+      `--skip=${skip}`,
+      `--max-count=${limit + 1}`,
+      "--regexp-ignore-case",
+      "--fixed-strings",
+      ...filters,
+      "HEAD",
+      "--",
+    ],
+    { cwd, maxBuffer: 64 * 1024 * 1024 },
+  );
+  const values = stdout.split("\0");
+  const commits = [];
+  for (let i = 0; i + fields.length <= values.length; i += fields.length) {
+    const [sha, parents, name, email, date, subject] = values.slice(i, i + fields.length);
+    commits.push({ sha, parents: parents === "" ? [] : parents.split(" "), author: { name, email }, date, subject });
+  }
+  return { commits: commits.slice(0, limit), hasMore: commits.length > limit };
 }

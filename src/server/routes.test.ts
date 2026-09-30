@@ -12,6 +12,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     getCommit: unstubbed,
     listChanges: unstubbed,
     getFileDiff: unstubbed,
+    listCommits: unstubbed,
     ...overrides,
   });
 }
@@ -188,6 +189,35 @@ describe("GET /api/file-diff", () => {
     ]) {
       const res = await app.request(`/api/file-diff?${query}`);
       expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("GET /api/history", () => {
+  it("passes paging and filters through with defaults", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      listCommits: async (query) => {
+        calls.push(query);
+        return { commits: [], hasMore: false };
+      },
+    });
+
+    expect((await app.request("/api/history")).status).toBe(200);
+    expect((await app.request("/api/history?skip=50&limit=20&message=%20fix%20&author=ada")).status).toBe(200);
+    expect((await app.request("/api/history?limit=100000")).status).toBe(200);
+    expect(calls).toEqual([
+      { skip: 0, limit: 50, message: "", author: "" },
+      { skip: 50, limit: 20, message: "fix", author: "ada" },
+      { skip: 0, limit: 200, message: "", author: "" },
+    ]);
+  });
+
+  it("rejects paging values that are not whole numbers", async () => {
+    const app = makeApp({});
+
+    for (const query of ["skip=-1", "limit=abc", "skip=1.5", "limit="]) {
+      expect((await app.request(`/api/history?${query}`)).status).toBe(400);
     }
   });
 });

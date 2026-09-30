@@ -25,9 +25,10 @@
     "node": ">=24"
   },
   "bin": {
-    "outil": "dist/server/cli.js"
+    "outil": "bin/outil.cjs"
   },
   "files": [
+    "bin",
     "dist"
   ],
   "scripts": {
@@ -35,8 +36,9 @@
     "dev": "vite",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build && vite build --ssr src/server/cli.ts --outDir dist/server",
+    "prepack": "pnpm build",
     "lint": "eslint .",
-    "start": "node dist/server/cli.js",
+    "start": "node bin/outil.cjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -1,11 +1,13 @@
 import { getFileDiff } from "./diff.ts";
 import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
-import { assertAnchorInDiff, createMemoryStore, createTargetResolver, createThread, deleteDraft, editDraft } from "./reviews.ts";
+import { assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft } from "./reviews.ts";
+import { createFileStore } from "./reviewFiles.ts";
 
 export function createApp(cwd: string) {
   const boundListChanges = (base: string | null, head: string) => listChanges(cwd, base, head);
-  const store = createMemoryStore(
+  const store = createFileStore(
+    cwd,
     createTargetResolver({
       assertCommits: (...shas) => assertCommits(cwd, ...shas),
       getCommit: (sha) => getCommit(cwd, sha),

@@ -262,7 +262,17 @@ describe("GET /api/compare", () => {
 const sha = "a".repeat(40);
 const sha2 = "b".repeat(40);
 
-const emptyReview = (target: ReviewTarget): Review => ({ key: sha, target, base: null, head: sha, threads: [], runs: [], nextThread: 1 });
+const emptyReview = (target: ReviewTarget): Review => ({
+  key: sha,
+  target,
+  base: null,
+  head: sha,
+  threads: [],
+  runs: [],
+  nextThread: 1,
+  revision: 0,
+  generation: "g1",
+});
 
 describe("GET /api/review", () => {
   it("resolves a commit target", async () => {

@@ -175,4 +175,6 @@ export type Review = {
   threads: Thread[]
   runs: Run[]
   nextThread: number
+  revision: number
+  generation: string
 }

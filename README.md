@@ -29,6 +29,18 @@ The review is only reachable from your own machine. Display choices (split or
 unified, wrapping, light or dark) and the files you marked as viewed are kept in
 the browser.
 
+## Reviews
+
+Drafts, sent comments, agent replies, and resolved state persist across
+reloads and restarts. Each review is stored as its own JSON file under
+`.git/outil/reviews/` in the reviewed repository's git directory, keyed by the
+commit or comparison it belongs to. Worktrees of the same repository share
+this data since it lives in the common git directory. It stays on your
+machine, is never part of the repository's history, and never shows up in
+`git status`. To delete it, remove the `outil` folder inside `.git` (or
+inside the directory `git rev-parse --git-common-dir` prints, for a
+worktree).
+
 ## Requirements
 
 - Node.js 24 or newer

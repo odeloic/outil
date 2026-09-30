@@ -37,11 +37,21 @@ export function createTargetResolver({ assertCommits, getCommit, compareCommits 
   };
 }
 
-function emptyReview(target: ReviewTarget, resolution: TargetResolution): Review {
-  return { key: resolution.key, target, base: resolution.base, head: resolution.head, threads: [], runs: [], nextThread: 1 };
+export function emptyReview(target: ReviewTarget, resolution: TargetResolution): Review {
+  return {
+    key: resolution.key,
+    target,
+    base: resolution.base,
+    head: resolution.head,
+    threads: [],
+    runs: [],
+    nextThread: 1,
+    revision: 0,
+    generation: crypto.randomUUID(),
+  };
 }
 
-function enqueue<T>(queue: Map<string, Promise<unknown>>, key: string, task: () => Promise<T>): Promise<T> {
+export function enqueue<T>(queue: Map<string, Promise<unknown>>, key: string, task: () => Promise<T>): Promise<T> {
   const tail = queue.get(key) ?? Promise.resolve();
   const run = tail.then(task, task);
   queue.set(
@@ -52,28 +62,6 @@ function enqueue<T>(queue: Map<string, Promise<unknown>>, key: string, task: () 
     ),
   );
   return run;
-}
-
-export function createMemoryStore(resolve: ResolveTarget): ReviewStore {
-  const reviews = new Map<string, Review>();
-  const queue = new Map<string, Promise<unknown>>();
-
-  return {
-    async get(target) {
-      const resolution = await resolve(target);
-      return reviews.get(resolution.key) ?? emptyReview(target, resolution);
-    },
-    update(target, fn) {
-      return resolve(target).then((resolution) =>
-        enqueue(queue, resolution.key, async () => {
-          const current = reviews.get(resolution.key) ?? emptyReview(target, resolution);
-          const next = await fn(current);
-          reviews.set(resolution.key, next);
-          return next;
-        }),
-      );
-    },
-  };
 }
 
 export function createThread(review: Review, anchor: ThreadAnchor, body: string): Review {

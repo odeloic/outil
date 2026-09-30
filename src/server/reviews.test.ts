@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Review, ReviewTarget } from "../shared/api.ts";
 import {
   assertAnchorInDiff,
-  createMemoryStore,
   createTargetResolver,
   createThread,
   deleteDraft,
@@ -14,7 +13,7 @@ const sha = "a".repeat(40);
 const parent = "b".repeat(40);
 
 function emptyReview(target: ReviewTarget = { kind: "commit", sha }): Review {
-  return { key: sha, target, base: null, head: sha, threads: [], runs: [], nextThread: 1 };
+  return { key: sha, target, base: null, head: sha, threads: [], runs: [], nextThread: 1, revision: 0, generation: "g1" };
 }
 
 const anchor = { path: "src/a.ts", side: "new" as const, startLine: 3, endLine: 5 };
@@ -208,74 +207,5 @@ describe("createTargetResolver", () => {
     });
 
     expect(await resolve({ kind: "compare", base: sha, head: other })).toEqual({ key: `${sha}..${other}`, base: sha, head: other });
-  });
-});
-
-describe("createMemoryStore", () => {
-  it("returns an equivalent empty review for the same target until it is updated", async () => {
-    const store = createMemoryStore(async () => ({ key: sha, base: null, head: sha }));
-    const target: ReviewTarget = { kind: "commit", sha };
-
-    const first = await store.get(target);
-    const second = await store.get(target);
-    expect(first).toEqual(emptyReview());
-    expect(second).toEqual(emptyReview());
-  });
-
-  it("persists changes made through update and returns them from get", async () => {
-    const store = createMemoryStore(async () => ({ key: sha, base: null, head: sha }));
-    const target: ReviewTarget = { kind: "commit", sha };
-
-    const updated = await store.update(target, (review) => createThread(review, anchor, "hi"));
-    expect(updated.threads).toHaveLength(1);
-    expect(await store.get(target)).toBe(updated);
-  });
-
-  it("keeps separate reviews per resolved key", async () => {
-    const shaB = "c".repeat(40);
-    const store = createMemoryStore(async (target) => {
-      const s = target.kind === "commit" ? target.sha : target.head;
-      return { key: s, base: null, head: s };
-    });
-
-    await store.update({ kind: "commit", sha }, (review) => createThread(review, anchor, "a"));
-    const other = await store.get({ kind: "commit", sha: shaB });
-    expect(other.threads).toEqual([]);
-  });
-
-  it("resolves the target exactly once per get or update call", async () => {
-    let resolves = 0;
-    const store = createMemoryStore(async () => {
-      resolves++;
-      return { key: sha, base: null, head: sha };
-    });
-    const target: ReviewTarget = { kind: "commit", sha };
-
-    await store.get(target);
-    expect(resolves).toBe(1);
-    await store.update(target, (review) => createThread(review, anchor, "a"));
-    expect(resolves).toBe(2);
-  });
-
-  it("serializes concurrent updates to the same key so no write is lost", async () => {
-    const delays = [30, 10, 20];
-    let call = 0;
-    const store = createMemoryStore(async () => {
-      const delay = delays[call++] ?? 0;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return { key: sha, base: null, head: sha };
-    });
-    const target: ReviewTarget = { kind: "commit", sha };
-
-    const [a, b, c] = await Promise.all([
-      store.update(target, (review) => createThread(review, anchor, "a")),
-      store.update(target, (review) => createThread(review, anchor, "b")),
-      store.update(target, (review) => createThread(review, anchor, "c")),
-    ]);
-
-    const final = await store.get(target);
-    expect(final.threads).toHaveLength(3);
-    expect(new Set(final.threads.map((t) => t.id)).size).toBe(3);
-    expect([a, b, c].every((r) => r.threads.length >= 1)).toBe(true);
   });
 });

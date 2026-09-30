@@ -1,7 +1,8 @@
-import { Fragment, memo, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, memo, useEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { LineSide, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { Button } from '../design-system'
 import { PendingThreadCard, ThreadView } from '../threads/ThreadView.tsx'
+import type { HeightStore } from './heightStore.ts'
 import type { Token } from './highlight.ts'
 import { EXPAND_STEP, type Expansion, type GapRow, type LineRow } from './rows.ts'
 import type { SplitLineRow, SplitSide } from './split.ts'
@@ -37,8 +38,7 @@ export type Comments = {
   rowExtras: RowExtras
   pendingComposer: PendingComposer
   threadHandlers: ThreadHandlers
-  heights: ReadonlyMap<string, number>
-  onHeight: (id: string, height: number) => void
+  heightStore: HeightStore
 }
 
 const SIGN = { context: ' ', add: '+', del: '−' } as const
@@ -248,11 +248,11 @@ function extraSide(extra: RowExtra): LineSide {
 
 const HeightTrackedCard = memo(function HeightTrackedCard({
   id,
-  onHeight,
+  store,
   children,
 }: {
   id: string
-  onHeight: (id: string, height: number) => void
+  store: HeightStore
   children: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -262,11 +262,11 @@ const HeightTrackedCard = memo(function HeightTrackedCard({
     if (!el || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver((entries) => {
       const height = entries[0]?.contentRect.height
-      if (height !== undefined) onHeight(id, Math.ceil(height))
+      if (height !== undefined) store.setHeight(id, Math.ceil(height))
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [id, onHeight])
+  }, [id, store])
 
   return (
     <div ref={ref} style={{ display: 'flow-root' }}>
@@ -275,10 +275,18 @@ const HeightTrackedCard = memo(function HeightTrackedCard({
   )
 })
 
+const MirrorSpacer = memo(function MirrorSpacer({ id, store }: { id: string; store: HeightStore }) {
+  const height = useSyncExternalStore(
+    (listener) => store.subscribe(id, listener),
+    () => store.getHeight(id),
+  )
+  return <div className="thread-card-spacer" style={{ height }} inert aria-hidden="true" />
+})
+
 function ExtrasAtRow({ index, comments, pane = null }: { index: number; comments: Comments; pane?: Pane }) {
   const extras = comments.rowExtras.get(index)
   if (!extras) return null
-  const { threadHandlers, pendingComposer, heights, onHeight } = comments
+  const { threadHandlers, pendingComposer, heightStore } = comments
   return (
     <>
       {extras.map((extra) => {
@@ -286,7 +294,7 @@ function ExtrasAtRow({ index, comments, pane = null }: { index: number; comments
         const nativePane = extraSide(extra) === 'old' ? 'left' : 'right'
         const mirror = pane !== null && nativePane !== pane
         if (mirror) {
-          return <div key={id} className="thread-card-spacer" style={{ height: heights.get(id) ?? 0 }} inert aria-hidden="true" />
+          return <MirrorSpacer key={id} id={id} store={heightStore} />
         }
         const card =
           extra.kind === 'thread' ? (
@@ -306,7 +314,7 @@ function ExtrasAtRow({ index, comments, pane = null }: { index: number; comments
         return pane === null ? (
           <Fragment key={id}>{card}</Fragment>
         ) : (
-          <HeightTrackedCard key={id} id={id} onHeight={onHeight}>
+          <HeightTrackedCard key={id} id={id} store={heightStore}>
             {card}
           </HeightTrackedCard>
         )

@@ -4,6 +4,7 @@ import { Button } from '../design-system'
 import { BodyNote } from './BodyNote.tsx'
 import { useDisplaySettings } from '../settings.ts'
 import { Chunk, PaneChunk, type Comments, type DisplayRow, type ExpandGap, type RowExtra, type Tokens } from './DiffLines.tsx'
+import { createHeightStore } from './heightStore.ts'
 import { highlight } from './highlight.ts'
 import { findAnchorRow, type PlacementRow } from './placement.ts'
 import { buildRows, splitLines, type Expansion } from './rows.ts'
@@ -38,7 +39,7 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
   const [confirmed, setConfirmed] = useState(false)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map())
+  const [heightStore] = useState(createHeightStore)
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>())
 
   const newLines = useMemo(() => splitLines(diff.newText), [diff.newText])
@@ -171,10 +172,6 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
     [onDeleteDraft, focusAnchor],
   )
 
-  const onHeight = useCallback((id: string, height: number) => {
-    setHeights((current) => (current.get(id) === height ? current : new Map(current).set(id, height)))
-  }, [])
-
   const selectedSet = useMemo(() => {
     if (!selection) return null
     const { side, startLine, endLine } = normalize(selection)
@@ -217,8 +214,7 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
         onSaveEdit,
         onDelete,
       },
-      heights,
-      onHeight,
+      heightStore,
     }),
     [
       onGutterClick,
@@ -234,8 +230,7 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
       onCancelEdit,
       onSaveEdit,
       onDelete,
-      heights,
-      onHeight,
+      heightStore,
     ],
   )
 

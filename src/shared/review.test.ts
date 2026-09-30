@@ -75,7 +75,17 @@ describe("threadStatus", () => {
 
 describe("draftCount", () => {
   function review(threads: Thread[]): Review {
-    return { key: "k", target: { kind: "commit", sha: "a".repeat(40) }, base: null, head: "a".repeat(40), threads, runs: [], nextThread: 1 }
+    return {
+      key: "k",
+      target: { kind: "commit", sha: "a".repeat(40) },
+      base: null,
+      head: "a".repeat(40),
+      threads,
+      runs: [],
+      nextThread: 1,
+      revision: 0,
+      generation: "g1",
+    }
   }
 
   it("counts only reviewer draft messages across all threads", () => {

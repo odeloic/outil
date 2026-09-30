@@ -1,6 +1,6 @@
 # Outil design guide
 
-Outil is a local code review tool: a developer comments on diff lines of a commit, sends the drafts to a coding agent (Claude Code, Codex, Gemini CLI, ...), and the agent replies in the same threads. This is the reasoning behind the tokens and primitives in `src/web/design-system/` — why each decision was made, not just what the values are.
+Outil is a local code review tool: a developer comments on diff lines of a commit, sends the drafts to a coding agent (Claude Code or Codex), and the agent replies in the same threads. This is the reasoning behind the tokens and primitives in `src/web/design-system/` — why each decision was made, not just what the values are.
 
 ## The status vocabulary
 

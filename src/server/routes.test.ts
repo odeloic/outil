@@ -13,6 +13,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     listChanges: unstubbed,
     getFileDiff: unstubbed,
     listCommits: unstubbed,
+    compareCommits: unstubbed,
     ...overrides,
   });
 }
@@ -219,5 +220,35 @@ describe("GET /api/history", () => {
     for (const query of ["skip=-1", "limit=abc", "skip=1.5", "limit="]) {
       expect((await app.request(`/api/history?${query}`)).status).toBe(400);
     }
+  });
+});
+
+describe("GET /api/compare", () => {
+  it("pins both references before comparing them", async () => {
+    const calls: string[][] = [];
+    const app = makeApp({
+      resolveCommit: async (ref) => `sha-of-${ref}`,
+      compareCommits: async (base, head) => {
+        calls.push([base, head]);
+        return {} as never;
+      },
+    });
+
+    expect((await app.request("/api/compare?base=main&head=feature/x")).status).toBe(200);
+    expect(calls).toEqual([["sha-of-main", "sha-of-feature/x"]]);
+  });
+
+  it("reports an unknown reference as a 400 and a missing one as a 400", async () => {
+    const app = makeApp({
+      resolveCommit: async (ref) => {
+        if (ref === "nope") throw new RefError("unknown", "no such ref");
+        return ref;
+      },
+    });
+
+    const unknown = await app.request("/api/compare?base=nope&head=main");
+    expect(unknown.status).toBe(400);
+    expect(await unknown.json()).toEqual({ error: "no such ref", code: "unknown" });
+    expect((await app.request("/api/compare?base=main")).status).toBe(400);
   });
 });

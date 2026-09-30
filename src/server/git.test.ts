@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { getCommit, listChanges, listCommits, resolveCommit } from "./git.ts";
+import { compareCommits, getCommit, listChanges, listCommits, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -341,5 +341,46 @@ describe("listCommits", () => {
     const { dir } = makeRepo();
 
     expect(await listCommits(dir, all)).toEqual({ commits: [], hasMore: false });
+  });
+});
+
+describe("compareCommits", () => {
+  it("counts the commits between two points and finds where they meet", async () => {
+    const { dir, commit } = makeRepo();
+    const start = commit("one");
+    commit("two");
+    const end = commit("three");
+
+    const comparison = await compareCommits(dir, start, end);
+    expect(comparison.base.sha).toBe(start);
+    expect(comparison.head.sha).toBe(end);
+    expect(comparison.head.subject).toBe("three");
+    expect(comparison.commitCount).toBe(2);
+    expect(comparison.mergeBase).toBe(start);
+    expect((await compareCommits(dir, end, start)).commitCount).toBe(0);
+  });
+
+  it("reports the common ancestor of diverged branches", async () => {
+    const { dir, git, commit } = makeRepo();
+    const fork = commit("base");
+    git("switch", "-q", "-c", "feature");
+    const feature = commit("feature");
+    git("switch", "-q", "main");
+    const main = commit("main");
+
+    const comparison = await compareCommits(dir, main, feature);
+    expect(comparison.mergeBase).toBe(fork);
+    expect(comparison.commitCount).toBe(1);
+  });
+
+  it("has no common ancestor for unrelated histories", async () => {
+    const { dir, git, commit } = makeRepo();
+    const first = commit("one");
+    git("switch", "-q", "--orphan", "other");
+    const other = commit("other");
+
+    const comparison = await compareCommits(dir, first, other);
+    expect(comparison.mergeBase).toBeNull();
+    expect(comparison.commitCount).toBe(1);
   });
 });

@@ -1,0 +1,24 @@
+.rail-row {
+  width: 100%;
+  border: 0;
+  border-radius: var(--ods-radius-md);
+  background: none;
+  color: var(--ods-fg);
+  font: var(--ods-text-sm) var(--ods-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail-row:hover {
+  background: var(--ods-sunken);
+}
+
+.rail-row:focus-visible {
+  outline: 2px solid var(--ods-agent);
+  outline-offset: -2px;
+}
+
+.rail-row[aria-current="true"] {
+  background: var(--ods-sunken);
+  box-shadow: inset 2px 0 0 var(--ods-fg);
+}

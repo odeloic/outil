@@ -28,29 +28,7 @@
   display: flex;
   align-items: center;
   gap: var(--ods-space-5);
-  width: 100%;
   padding: var(--ods-space-3) var(--ods-space-5);
-  border: 0;
-  border-radius: var(--ods-radius-md);
-  background: none;
-  color: var(--ods-fg);
-  font: var(--ods-text-sm) var(--ods-font-ui);
-  text-align: left;
-  cursor: pointer;
-}
-
-.file-list__row:hover {
-  background: var(--ods-sunken);
-}
-
-.file-list__row:focus-visible {
-  outline: 2px solid var(--ods-agent);
-  outline-offset: -2px;
-}
-
-.file-list__row[aria-current="true"] {
-  background: var(--ods-sunken);
-  box-shadow: inset 2px 0 0 var(--ods-fg);
 }
 
 .file-list__row--viewed .file-list__path {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ChangeSet } from '../../shared/api.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Button, Tabs } from '../design-system'
+import { Button, Note, Tabs } from '../design-system'
 import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
@@ -17,11 +17,21 @@ type Props = {
   header: ReactNode
   notice?: ReactNode
   pending: boolean
-  selectedCommit: string
+  selectedCommits: string[]
   onSelectCommit: (sha: string) => void
+  onCompare: (base: string, head: string) => void
 }
 
-export function Review({ reviewKey, changes, header, notice, pending, selectedCommit, onSelectCommit }: Props) {
+export function Review({
+  reviewKey,
+  changes,
+  header,
+  notice,
+  pending,
+  selectedCommits,
+  onSelectCommit,
+  onCompare,
+}: Props) {
   const [viewed, setViewed] = useViewedFiles(reviewKey)
   const [overrides, setOverrides] = useState<{ key: string; map: ReadonlyMap<string, boolean> }>({
     key: reviewKey,
@@ -67,11 +77,11 @@ export function Review({ reviewKey, changes, header, notice, pending, selectedCo
             active={railTab}
             onChange={setRailTab}
           />
-          <div className="review__panel" hidden={railTab !== 'files'}>
+          <div className="review__panel" role="tabpanel" aria-label="Files" hidden={railTab !== 'files'}>
             <FileList changes={changes} current={current} viewed={viewed} onSelect={jumpToFile} />
           </div>
-          <div className="review__panel" hidden={railTab !== 'history'}>
-            <HistoryList selected={selectedCommit} onSelect={onSelectCommit} />
+          <div className="review__panel" role="tabpanel" aria-label="History" hidden={railTab !== 'history'}>
+            <HistoryList selected={selectedCommits} onSelect={onSelectCommit} onCompare={onCompare} />
           </div>
         </aside>
         <main className="review__main" aria-busy={pending}>
@@ -87,6 +97,7 @@ export function Review({ reviewKey, changes, header, notice, pending, selectedCo
             </span>
           </div>
           {notice}
+          {changes.files.length === 0 && <Note variant="hint">There are no changes to show.</Note>}
           {changes.files.map((file, index) => (
             <FileDiffView
               key={`${reviewKey}:${file.path}`}

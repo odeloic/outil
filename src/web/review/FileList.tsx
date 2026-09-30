@@ -4,6 +4,7 @@ import { DiffStat, FileStatusBadge, ProgressBar, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import { revealInScrollParent } from './navigation.ts'
 import './FileList.css'
+import './RailRow.css'
 
 function FilePath({ path }: { path: string }) {
   const slash = path.lastIndexOf('/')
@@ -39,7 +40,7 @@ const FileRow = memo(function FileRow({
       <button
         ref={ref}
         type="button"
-        className={`file-list__row${viewed ? ' file-list__row--viewed' : ''}`}
+        className={`rail-row file-list__row${viewed ? ' file-list__row--viewed' : ''}`}
         aria-current={current ? 'true' : undefined}
         onClick={() => onSelect(index)}
         title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}

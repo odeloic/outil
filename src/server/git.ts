@@ -1,6 +1,15 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ChangeSet, CommitDetails, FileChange, FileChangeStatus, HistoryPage, HistoryQuery, RepoInfo } from "../shared/api.ts";
+import type {
+  ChangeSet,
+  CommitDetails,
+  Comparison,
+  FileChange,
+  FileChangeStatus,
+  HistoryPage,
+  HistoryQuery,
+  RepoInfo,
+} from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 
 const exec = promisify(execFile);
@@ -166,4 +175,14 @@ export async function listCommits(cwd: string, { skip, limit, message, author }:
     commits.push({ sha, parents: parents === "" ? [] : parents.split(" "), author: { name, email }, date, subject });
   }
   return { commits: commits.slice(0, limit), hasMore: commits.length > limit };
+}
+
+export async function compareCommits(cwd: string, base: string, head: string): Promise<Comparison> {
+  const [baseDetails, headDetails, mergeBase, count] = await Promise.all([
+    getCommit(cwd, base),
+    getCommit(cwd, head),
+    tryGit(cwd, "merge-base", base, head),
+    git(cwd, "rev-list", "--count", `${base}..${head}`),
+  ]);
+  return { base: baseDetails, head: headDetails, mergeBase: mergeBase || null, commitCount: Number(count) };
 }

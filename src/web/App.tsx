@@ -1,52 +1,101 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ChangeSet, CommitDetails } from '../shared/api.ts'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { ChangeSet } from '../shared/api.ts'
 import { client, unwrap } from './api.ts'
 import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
 import { CommitHeader } from './review/CommitHeader.tsx'
+import { CompareHeader } from './review/CompareHeader.tsx'
 import { Review } from './review/Review.tsx'
 import { navigate, useSearch } from './router.ts'
 
-type Loaded = { commit: CommitDetails; changes: ChangeSet }
+type Target = { ref: string } | { base: string; head: string }
 
-async function load(ref: string): Promise<Loaded> {
-  const commit = await unwrap(client.api.commit.$get({ query: { ref } }))
-  const base = commit.parents[0]
-  const query = base ? { base, head: commit.sha } : { head: commit.sha }
-  const changes = await unwrap(client.api.changes.$get({ query }))
-  return { commit, changes }
+type Loaded = {
+  params: Record<string, string>
+  changes: ChangeSet
+  header: ReactNode
+  notice: ReactNode
+  commits: string[]
+}
+
+function parseTarget(search: string): Target {
+  const params = new URLSearchParams(search)
+  const base = params.get('base')
+  const head = params.get('head')
+  if (base !== null || head !== null) return { base: base ?? '', head: head ?? '' }
+  return { ref: params.get('ref') ?? 'HEAD' }
+}
+
+function targetKey(target: Target): string {
+  return new URLSearchParams('ref' in target ? { ref: target.ref } : { base: target.base, head: target.head }).toString()
+}
+
+async function changesBetween(base: string | null, head: string): Promise<ChangeSet> {
+  return unwrap(client.api.changes.$get({ query: base ? { base, head } : { head } }))
+}
+
+async function load(target: Target): Promise<Loaded> {
+  if ('ref' in target) {
+    const commit = await unwrap(client.api.commit.$get({ query: { ref: target.ref } }))
+    const changes = await changesBetween(commit.parents[0] ?? null, commit.sha)
+    return {
+      params: { ref: commit.sha },
+      changes,
+      commits: [commit.sha],
+      header: <CommitHeader commit={commit} />,
+      notice: commit.parents.length > 1 && (
+        <Note>
+          This is a merge commit. Changes are shown against its first parent, <code>{shortSha(commit.parents[0])}</code>.
+        </Note>
+      ),
+    }
+  }
+  const comparison = await unwrap(client.api.compare.$get({ query: target }))
+  const changes = await changesBetween(comparison.mergeBase ?? comparison.base.sha, comparison.head.sha)
+  return {
+    params: { base: comparison.base.sha, head: comparison.head.sha },
+    changes,
+    commits: [comparison.base.sha, comparison.head.sha],
+    header: <CompareHeader comparison={comparison} />,
+    notice: null,
+  }
 }
 
 function openCommit(sha: string) {
   navigate({ ref: sha })
 }
 
+function openComparison(base: string, head: string) {
+  navigate({ base, head })
+}
+
 function App() {
-  const ref = new URLSearchParams(useSearch()).get('ref') ?? 'HEAD'
+  const target = parseTarget(useSearch())
+  const key = targetKey(target)
   const [review, setReview] = useState<Loaded | null>(null)
-  const [error, setError] = useState<{ ref: string; message: string } | null>(null)
-  const loadedSha = useRef<string | null>(null)
-  const pending = review !== null && ref !== review.commit.sha && error?.ref !== ref
+  const [error, setError] = useState<{ key: string; message: string } | null>(null)
+  const loadedKey = useRef<string | null>(null)
+  const pending = review !== null && key !== targetKey(review.params as Target) && error?.key !== key
 
   useEffect(() => {
-    if (ref === loadedSha.current) return
+    if (key === loadedKey.current) return
     let cancelled = false
-    load(ref)
+    load(parseTarget(key))
       .then((loaded) => {
         if (cancelled) return
-        loadedSha.current = loaded.commit.sha
+        loadedKey.current = targetKey(loaded.params as Target)
         setReview(loaded)
         setError(null)
         window.scrollTo(0, 0)
-        if (ref !== loaded.commit.sha) navigate({ ref: loaded.commit.sha }, { replace: true })
+        if (key !== loadedKey.current) navigate(loaded.params, { replace: true })
       })
-      .catch((err: Error) => !cancelled && setError({ ref, message: err.message }))
+      .catch((err: Error) => !cancelled && setError({ key, message: err.message }))
     return () => {
       cancelled = true
     }
-  }, [ref])
+  }, [key])
 
-  if (error?.ref === ref) {
+  if (error?.key === key) {
     return (
       <div className="app-status">
         <Note variant="failure" action={<a href="?">Open the latest commit</a>}>
@@ -58,28 +107,21 @@ function App() {
   if (!review) {
     return (
       <p className="app-status">
-        <Spinner /> Loading commit…
+        <Spinner /> Loading…
       </p>
     )
   }
 
-  const { commit, changes } = review
   return (
     <Review
-      reviewKey={commit.sha}
-      changes={changes}
+      reviewKey={review.commits.join('..')}
+      changes={review.changes}
       pending={pending}
-      selectedCommit={commit.sha}
+      selectedCommits={review.commits}
       onSelectCommit={openCommit}
-      header={<CommitHeader commit={commit} />}
-      notice={
-        commit.parents.length > 1 && (
-          <Note>
-            This is a merge commit. Changes are shown against its first parent,{' '}
-            <code>{shortSha(commit.parents[0])}</code>.
-          </Note>
-        )
-      }
+      onCompare={openComparison}
+      header={review.header}
+      notice={review.notice}
     />
   )
 }

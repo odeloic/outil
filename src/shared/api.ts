@@ -37,6 +37,13 @@ export type ChangeSet = {
   deletions: number
 }
 
+export type Comparison = {
+  base: CommitDetails
+  head: CommitDetails
+  mergeBase: string | null
+  commitCount: number
+}
+
 export type CommitSummary = {
   sha: string
   parents: string[]

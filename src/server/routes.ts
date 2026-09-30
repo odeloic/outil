@@ -4,6 +4,7 @@ import type {
   ApiError,
   ChangeSet,
   CommitDetails,
+  Comparison,
   FileDiff,
   FileDiffRequest,
   HistoryPage,
@@ -20,6 +21,7 @@ export type RouteDeps = {
   listChanges: (base: string | null, head: string) => Promise<ChangeSet>;
   getFileDiff: (request: FileDiffRequest) => Promise<FileDiff>;
   listCommits: (query: HistoryQuery) => Promise<HistoryPage>;
+  compareCommits: (base: string, head: string) => Promise<Comparison>;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -85,7 +87,15 @@ function refFailure(err: unknown) {
   return [toApiError(err), err instanceof RefError ? 400 : 500] as const;
 }
 
-export function createRoutes({ repoInfo, resolveCommit, getCommit, listChanges, getFileDiff, listCommits }: RouteDeps) {
+export function createRoutes({
+  repoInfo,
+  resolveCommit,
+  getCommit,
+  listChanges,
+  getFileDiff,
+  listCommits,
+  compareCommits,
+}: RouteDeps) {
   return new Hono()
     .get("/api/repo", async (c) => {
       try {
@@ -127,6 +137,25 @@ export function createRoutes({ repoInfo, resolveCommit, getCommit, listChanges, 
         return c.json(...refFailure(err));
       }
     })
+    .get(
+      "/api/compare",
+      validator("query", (query, c): { base: string; head: string } | Response => {
+        const { base, head } = query;
+        if (typeof base !== "string" || typeof head !== "string") {
+          return c.json({ error: "A comparison needs a base and a head reference." } satisfies ApiError, 400);
+        }
+        return { base, head };
+      }),
+      async (c) => {
+        const { base, head } = c.req.valid("query");
+        try {
+          const [baseSha, headSha] = await Promise.all([resolveCommit(base), resolveCommit(head)]);
+          return c.json(await compareCommits(baseSha, headSha), 200);
+        } catch (err) {
+          return c.json(...refFailure(err));
+        }
+      },
+    )
     .get("/api/history", historyQuery, async (c) => {
       const query = c.req.valid("query");
       try {

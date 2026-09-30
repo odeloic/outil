@@ -1,8 +1,7 @@
-import type { ChangeSet, FileChange, FileChangeStatus } from '../../shared/api.ts'
-import { DiffStat, FileStatusBadge, Tag, type FileStatus } from '../design-system'
+import type { ChangeSet, FileChange } from '../../shared/api.ts'
+import { DiffStat, FileStatusBadge, Tag } from '../design-system'
+import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import './FileList.css'
-
-const BADGE: Record<FileChangeStatus, FileStatus> = { added: 'A', modified: 'M', deleted: 'D', renamed: 'R' }
 
 function FilePath({ path }: { path: string }) {
   const slash = path.lastIndexOf('/')
@@ -17,7 +16,7 @@ function FilePath({ path }: { path: string }) {
 function FileRow({ file }: { file: FileChange }) {
   return (
     <li className="file-list__row">
-      <FileStatusBadge status={BADGE[file.status]} />
+      <FileStatusBadge status={FILE_STATUS_BADGE[file.status]} />
       <span className="file-list__name" title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}>
         {file.oldPath && (
           <>

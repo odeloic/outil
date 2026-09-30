@@ -5,6 +5,7 @@ import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
 import { FileDiffView } from './diff/FileDiffView.tsx'
 import { CommitHeader } from './review/CommitHeader.tsx'
+import { DisplayOptions } from './review/DisplayOptions.tsx'
 import { FileList } from './review/FileList.tsx'
 import './review/Review.css'
 
@@ -53,6 +54,7 @@ function App() {
           <FileList changes={changes} />
         </aside>
         <main className="review__main">
+          <DisplayOptions />
           {commit.parents.length > 1 && (
             <Note>
               This is a merge commit. Changes are shown against its first parent,{' '}

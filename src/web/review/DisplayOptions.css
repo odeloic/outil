@@ -1,0 +1,6 @@
+.display-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ods-space-5);
+}

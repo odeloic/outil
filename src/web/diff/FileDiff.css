@@ -43,21 +43,28 @@
 }
 
 .diff {
+  --diff-num-width: max(3ch, calc(var(--diff-num-digits) * 1ch));
   width: max-content;
   min-width: 100%;
+  tab-size: var(--diff-tab-width);
   font: var(--ods-text-xs) / var(--diff-line-height) var(--ods-font-mono);
   color: var(--ods-fg);
 }
 
-.diff__row {
+.diff__chunk {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto calc(var(--diff-chunk-rows) * var(--diff-line-height));
+}
+
+.diff__row,
+.diff__line {
   display: flex;
 }
 
 .diff__num {
   flex: none;
   box-sizing: content-box;
-  width: calc(var(--diff-num-digits) * 1ch);
-  min-width: 3ch;
+  width: var(--diff-num-width);
   padding: 0 var(--ods-space-5);
   text-align: right;
   color: var(--ods-fg-3);
@@ -77,29 +84,76 @@
   padding-right: var(--ods-space-12);
 }
 
-.diff__row--add {
+.diff__line--add {
   background: var(--ods-add-bg);
 }
 
-.diff__row--add .diff__num {
+.diff__line--add .diff__num {
   background: var(--ods-add-line);
 }
 
-.diff__row--add .diff__sign {
+.diff__line--add .diff__sign {
   color: var(--ods-add-fg);
 }
 
-.diff__row--del {
+.diff__line--del {
   background: var(--ods-del-bg);
 }
 
-.diff__row--del .diff__num {
+.diff__line--del .diff__num {
   background: var(--ods-del-line);
 }
 
-.diff__row--del .diff__sign {
+.diff__line--del .diff__sign {
   color: var(--ods-del-fg);
 }
+
+.diff--split .diff__half {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.diff--split .diff__half + .diff__half,
+.diff__pane + .diff__pane {
+  border-left: 1px solid var(--ods-line);
+}
+
+.diff--panes {
+  display: flex;
+  width: auto;
+}
+
+.diff__pane {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.diff__pane-content {
+  width: max-content;
+  min-width: 100%;
+}
+
+.diff__gap--mirror .diff__gap-actions {
+  visibility: hidden;
+}
+
+.diff__half--empty {
+  min-height: var(--diff-line-height);
+  background: var(--ods-sunken);
+}
+
+.diff--wrap {
+  width: 100%;
+}
+
+.diff--wrap .diff__code {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 
 .diff__gap {
   background: var(--ods-sunken);
@@ -119,9 +173,4 @@
 .diff__gap-header {
   color: var(--ods-fg-3);
   padding-left: var(--ods-space-5);
-}
-
-.diff__chunk {
-  content-visibility: auto;
-  contain-intrinsic-size: auto none auto calc(var(--diff-chunk-rows) * var(--diff-line-height));
 }

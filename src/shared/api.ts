@@ -4,6 +4,14 @@ export type RepoInfo = {
   head: string | null
 }
 
+export type ResolvedCommit = {
+  ref: string
+  sha: string
+}
+
+export type RefErrorCode = "empty-repo" | "unknown" | "ambiguous" | "not-a-commit" | "not-single"
+
 export type ApiError = {
   error: string
+  code?: RefErrorCode
 }

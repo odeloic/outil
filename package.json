@@ -36,7 +36,8 @@
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build && vite build --ssr src/server/cli.ts --outDir dist/server",
     "lint": "eslint .",
-    "start": "node dist/server/cli.js"
+    "start": "node dist/server/cli.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

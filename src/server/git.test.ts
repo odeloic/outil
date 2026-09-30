@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { resolveCommit } from "./git.ts";
+import { getCommit, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -129,5 +129,56 @@ describe("resolveCommit", () => {
     const err = await refError(resolveCommit(dir, "HEAD"));
     expect(err.code).toBe("empty-repo");
     expect(err.message).toContain("no commits yet");
+  });
+});
+
+describe("getCommit", () => {
+  it("returns the author, date, parents, and message with its line breaks", async () => {
+    const { dir, git, commit } = makeRepo();
+    const parent = commit("one");
+    writeFileSync(join(dir, "file.txt"), "two");
+    git("add", "file.txt");
+    git(
+      "-c", "user.name=Ada Lovelace", "-c", "user.email=ada@example.com",
+      "commit", "-q", "--cleanup=verbatim", "--date=2026-09-30T10:00:00+02:00",
+      "-m", "Subject line", "-m", "First body line\nSecond body line\n\nNew paragraph",
+    );
+    const sha = git("rev-parse", "HEAD");
+
+    expect(await getCommit(dir, sha)).toEqual({
+      sha,
+      parents: [parent],
+      author: { name: "Ada Lovelace", email: "ada@example.com" },
+      date: "2026-09-30T10:00:00+02:00",
+      subject: "Subject line",
+      body: "First body line\nSecond body line\n\nNew paragraph",
+    });
+  });
+
+  it("returns no parents for a root commit and an empty body for a one-line message", async () => {
+    const { dir, commit } = makeRepo();
+    const sha = commit("only");
+
+    const details = await getCommit(dir, sha);
+    expect(details.parents).toEqual([]);
+    expect(details.subject).toBe("only");
+    expect(details.body).toBe("");
+  });
+
+  it("lists both parents of a merge commit, first parent first", async () => {
+    const { dir, git, commit } = makeRepo();
+    commit("base");
+    git("switch", "-q", "-c", "side");
+    writeFileSync(join(dir, "side.txt"), "side");
+    git("add", "side.txt");
+    git("commit", "-q", "-m", "side");
+    const side = git("rev-parse", "HEAD");
+    git("switch", "-q", "main");
+    const main = commit("main");
+    git("merge", "-q", "--no-ff", "-m", "Merge side", "side");
+
+    const details = await getCommit(dir, git("rev-parse", "HEAD"));
+    expect(details.parents).toEqual([main, side]);
+    expect(details.subject).toBe("Merge side");
   });
 });

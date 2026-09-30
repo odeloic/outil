@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { RepoInfo } from "../shared/api.ts";
+import type { CommitDetails, RepoInfo } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 
 const exec = promisify(execFile);
@@ -52,4 +52,19 @@ async function explainUnresolved(cwd: string, ref: string): Promise<RefError> {
     }
   }
   return new RefError("unknown", `"${ref}" does not match any commit, branch, or tag in this repository.`);
+}
+
+export async function getCommit(cwd: string, sha: string): Promise<CommitDetails> {
+  const format = ["%H", "%P", "%an", "%ae", "%aI", "%B"].join("%x00");
+  const out = await git(cwd, "show", "-s", "--no-show-signature", `--format=${format}`, "--end-of-options", sha);
+  const [hash, parents, name, email, date, message] = out.split("\0");
+  const [subject, ...rest] = message.split("\n");
+  return {
+    sha: hash,
+    parents: parents === "" ? [] : parents.split(" "),
+    author: { name, email },
+    date,
+    subject,
+    body: rest.join("\n").replace(/^\s*\n/, "").trimEnd(),
+  };
 }

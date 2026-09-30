@@ -45,6 +45,9 @@ worktree).
 
 - Node.js 24 or newer
 - git
+- To ask a coding agent for a review, [Claude Code](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+  or [Codex](https://www.npmjs.com/package/@openai/codex) installed and signed in. Check availability any
+  time from the Agents panel in the review's left rail.
 
 ## Develop
 

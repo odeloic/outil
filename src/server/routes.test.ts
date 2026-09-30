@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Review, ReviewTarget } from "../shared/api.ts";
+import type { AgentStatus, Review, ReviewTarget } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
 import { createRoutes, type RouteDeps } from "./routes.ts";
@@ -20,6 +20,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     createThread: unstubbed,
     editDraft: unstubbed,
     deleteDraft: unstubbed,
+    detectAgents: unstubbed,
     ...overrides,
   });
 }
@@ -482,5 +483,81 @@ describe("DELETE /api/review/messages/:id", () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/agents", () => {
+  const agents: AgentStatus[] = [{ id: "claude", name: "Claude Code", state: "ready", fix: null }];
+
+  it("caches the detection result across requests", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => {
+        calls++;
+        return agents;
+      },
+    });
+
+    const first = await app.request("/api/agents");
+    const second = await app.request("/api/agents");
+    expect(first.status).toBe(200);
+    expect(await first.json()).toEqual(agents);
+    expect(await second.json()).toEqual(agents);
+    expect(calls).toBe(1);
+  });
+
+  it("re-detects when refresh=1 is given", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => {
+        calls++;
+        return agents;
+      },
+    });
+
+    await app.request("/api/agents");
+    await app.request("/api/agents?refresh=1");
+    expect(calls).toBe(2);
+  });
+
+  it("shares one in-flight detection promise between concurrent calls", async () => {
+    let calls = 0;
+    let resolve!: (value: AgentStatus[]) => void;
+    const app = makeApp({
+      detectAgents: () => {
+        calls++;
+        return new Promise((res) => {
+          resolve = res;
+        });
+      },
+    });
+
+    const first = app.request("/api/agents");
+    const second = app.request("/api/agents");
+    await new Promise((r) => setTimeout(r, 0));
+    resolve(agents);
+    const [firstRes, secondRes] = await Promise.all([first, second]);
+    expect(calls).toBe(1);
+    expect(await firstRes.json()).toEqual(agents);
+    expect(await secondRes.json()).toEqual(agents);
+  });
+
+  it("reports detection failures as a 500 and retries on the next call", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => {
+        calls++;
+        if (calls === 1) throw new Error("detection failed");
+        return agents;
+      },
+    });
+
+    const failed = await app.request("/api/agents");
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toEqual({ error: "detection failed" });
+
+    const ok = await app.request("/api/agents");
+    expect(ok.status).toBe(200);
+    expect(calls).toBe(2);
   });
 });

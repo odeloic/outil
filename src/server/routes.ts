@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import type {
+  AgentStatus,
   ApiError,
   ChangeSet,
   CommitDetails,
@@ -30,6 +31,7 @@ export type RouteDeps = {
   createThread: (target: ReviewTarget, anchor: ThreadAnchor, body: string) => Promise<Review>;
   editDraft: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
   deleteDraft: (target: ReviewTarget, id: string) => Promise<Review>;
+  detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -135,6 +137,8 @@ const targetOnlyBody = validator("json", (body, c): { target: ReviewTarget } | R
   return { target };
 });
 
+const agentsQuery = validator("query", (query): { refresh?: string } => (query.refresh === "1" ? { refresh: "1" } : {}));
+
 export const MAX_HISTORY_PAGE = 200;
 
 function count(value: unknown, fallback: number, max: number): number | null {
@@ -178,7 +182,9 @@ export function createRoutes({
   createThread,
   editDraft,
   deleteDraft,
+  detectAgents,
 }: RouteDeps) {
+  let agentsCache: Promise<AgentStatus[]> | null = null;
   return new Hono()
     .get("/api/repo", async (c) => {
       try {
@@ -283,6 +289,16 @@ export function createRoutes({
         return c.json(await deleteDraft(target, c.req.param("id")), 200);
       } catch (err) {
         return c.json(...reviewFailure(err));
+      }
+    })
+    .get("/api/agents", agentsQuery, async (c) => {
+      const refresh = c.req.valid("query").refresh === "1";
+      try {
+        if (refresh || !agentsCache) agentsCache = detectAgents(refresh);
+        return c.json(await agentsCache, 200);
+      } catch (err) {
+        agentsCache = null;
+        return c.json(toApiError(err), 500);
       }
     });
 }

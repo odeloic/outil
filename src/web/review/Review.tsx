@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ChangeSet, ReviewTarget, Run, Thread } from '../../shared/api.ts'
 import { draftCount } from '../../shared/review.ts'
+import { AgentPanel } from '../agents/AgentPanel.tsx'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
 import { Button, CountBadge, Note, Tabs } from '../design-system'
 import { initials } from '../threads/initials.ts'
@@ -97,6 +98,7 @@ export function Review({
             </div>
             <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
             {error && <Note variant="failure">{error}</Note>}
+            <AgentPanel />
           </div>
           <Tabs<RailTab>
             tabs={[

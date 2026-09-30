@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { CommitDetails, RepoInfo } from "../shared/api.ts";
+import type { ChangeSet, CommitDetails, FileChange, FileChangeStatus, RepoInfo } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 
 const exec = promisify(execFile);
@@ -66,5 +66,58 @@ export async function getCommit(cwd: string, sha: string): Promise<CommitDetails
     date,
     subject,
     body: rest.join("\n").replace(/^\s*\n/, "").trimEnd(),
+  };
+}
+
+const STATUS: Record<string, FileChangeStatus> = { A: "added", D: "deleted", M: "modified", T: "modified", R: "renamed" };
+
+export function emptyTree(cwd: string): Promise<string> {
+  return git(cwd, "hash-object", "-t", "tree", "/dev/null");
+}
+
+export async function assertCommits(cwd: string, ...shas: string[]): Promise<void> {
+  for (const sha of shas) {
+    if ((await tryGit(cwd, "rev-parse", "--verify", "--quiet", `${sha}^{commit}`)) === null) {
+      throw new RefError("unknown", `Commit ${sha} does not exist in this repository.`);
+    }
+  }
+}
+
+export async function listChanges(cwd: string, base: string | null, head: string): Promise<ChangeSet> {
+  await assertCommits(cwd, ...(base ? [base, head] : [head]));
+  const from = base ?? (await emptyTree(cwd));
+  const diff = (format: string) =>
+    exec("git", ["diff", "--no-ext-diff", "--no-textconv", "--no-relative", "-z", "-M", format, from, head, "--"], {
+      cwd,
+      maxBuffer: 64 * 1024 * 1024,
+    }).then(({ stdout }) => stdout.split("\0"));
+  const [raw, numstat] = await Promise.all([diff("--raw"), diff("--numstat")]);
+
+  const files: FileChange[] = [];
+  for (let r = 0, n = 0; r < raw.length && raw[r] !== ""; ) {
+    const letter = raw[r++].split(" ")[4][0];
+    const renamed = letter === "R";
+    const oldPath = renamed ? raw[r++] : null;
+    const path = raw[r++];
+
+    const [added, deleted] = numstat[n++].split("\t");
+    if (renamed) n += 2;
+    const binary = added === "-";
+    files.push({
+      path,
+      oldPath,
+      status: STATUS[letter] ?? "modified",
+      additions: binary ? 0 : Number(added),
+      deletions: binary ? 0 : Number(deleted),
+      binary,
+    });
+  }
+
+  return {
+    base,
+    head,
+    files,
+    additions: files.reduce((sum, f) => sum + f.additions, 0),
+    deletions: files.reduce((sum, f) => sum + f.deletions, 0),
   };
 }

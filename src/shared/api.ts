@@ -18,6 +18,25 @@ export type CommitDetails = {
   body: string
 }
 
+export type FileChangeStatus = "added" | "modified" | "deleted" | "renamed"
+
+export type FileChange = {
+  path: string
+  oldPath: string | null
+  status: FileChangeStatus
+  additions: number
+  deletions: number
+  binary: boolean
+}
+
+export type ChangeSet = {
+  base: string | null
+  head: string
+  files: FileChange[]
+  additions: number
+  deletions: number
+}
+
 export type RefErrorCode = "empty-repo" | "unknown" | "ambiguous" | "not-a-commit" | "not-single"
 
 export type ApiError = {

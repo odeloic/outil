@@ -10,6 +10,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     repoInfo: async () => ({ root: "/repo", head: null }),
     resolveCommit: unstubbed,
     getCommit: unstubbed,
+    listChanges: unstubbed,
     ...overrides,
   });
 }
@@ -86,5 +87,33 @@ describe("GET /api/commit", () => {
     const res = await app.request("/api/commit?ref=nope");
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "no such ref", code: "unknown" });
+  });
+});
+
+describe("GET /api/changes", () => {
+  const head = "a".repeat(40);
+  const base = "b".repeat(40);
+
+  it("lists changes between base and head, or from nothing when base is absent", async () => {
+    const calls: [string | null, string][] = [];
+    const app = makeApp({
+      listChanges: async (from, to) => {
+        calls.push([from, to]);
+        return { base: from, head: to, files: [], additions: 0, deletions: 0 };
+      },
+    });
+
+    expect((await app.request(`/api/changes?base=${base}&head=${head}`)).status).toBe(200);
+    expect((await app.request(`/api/changes?head=${head}`)).status).toBe(200);
+    expect(calls).toEqual([[base, head], [null, head]]);
+  });
+
+  it("rejects anything that is not a full commit id", async () => {
+    const app = makeApp({});
+
+    for (const query of ["", `head=main`, `head=${head}&base=HEAD~1`, `head=--all`, `head=${head.slice(0, 7)}`]) {
+      const res = await app.request(`/api/changes?${query}`);
+      expect(res.status).toBe(400);
+    }
   });
 });

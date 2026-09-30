@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { getCommit, resolveCommit } from "./git.ts";
+import { getCommit, listChanges, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -180,5 +180,97 @@ describe("getCommit", () => {
     const details = await getCommit(dir, git("rev-parse", "HEAD"));
     expect(details.parents).toEqual([main, side]);
     expect(details.subject).toBe("Merge side");
+  });
+});
+
+describe("listChanges", () => {
+  function write(dir: string, path: string, content: string | Buffer) {
+    mkdirSync(join(dir, path, ".."), { recursive: true });
+    writeFileSync(join(dir, path), content);
+  }
+
+  it("lists every file of a root commit as added", async () => {
+    const { dir, git } = makeRepo();
+    write(dir, "a.txt", "one\ntwo\n");
+    write(dir, "src/b.ts", "x\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "root");
+    const head = git("rev-parse", "HEAD");
+
+    const changes = await listChanges(dir, null, head);
+    expect(changes.base).toBeNull();
+    expect(changes.files).toEqual([
+      { path: "a.txt", oldPath: null, status: "added", additions: 2, deletions: 0, binary: false },
+      { path: "src/b.ts", oldPath: null, status: "added", additions: 1, deletions: 0, binary: false },
+    ]);
+    expect([changes.additions, changes.deletions]).toEqual([3, 0]);
+  });
+
+  it("reports modified, deleted, renamed, and binary files with line counts", async () => {
+    const { dir, git } = makeRepo();
+    write(dir, "keep.txt", "a\nb\nc\n");
+    write(dir, "gone.txt", "bye\n");
+    write(dir, "docs/old name.md", "line 1\nline 2\nline 3\nline 4\nline 5\n");
+    write(dir, "logo.png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]));
+    git("add", "-A");
+    git("commit", "-q", "-m", "one");
+    const base = git("rev-parse", "HEAD");
+
+    write(dir, "keep.txt", "a\nB\nc\nd\n");
+    git("rm", "-q", "gone.txt");
+    git("mv", "docs/old name.md", "docs/new name.md");
+    write(dir, "docs/new name.md", "line 1\nline 2\nline 3\nline 4\nline five\n");
+    write(dir, "logo.png", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 3, 4]));
+    git("add", "-A");
+    git("commit", "-q", "-m", "two");
+    const head = git("rev-parse", "HEAD");
+
+    const changes = await listChanges(dir, base, head);
+    expect(changes.files).toEqual([
+      { path: "docs/new name.md", oldPath: "docs/old name.md", status: "renamed", additions: 1, deletions: 1, binary: false },
+      { path: "gone.txt", oldPath: null, status: "deleted", additions: 0, deletions: 1, binary: false },
+      { path: "keep.txt", oldPath: null, status: "modified", additions: 2, deletions: 1, binary: false },
+      { path: "logo.png", oldPath: null, status: "modified", additions: 0, deletions: 0, binary: true },
+    ]);
+    expect([changes.additions, changes.deletions]).toEqual([3, 3]);
+  });
+
+  it("keeps paths with leading tabs and ignores diff.relative from a subfolder", async () => {
+    const { dir, git } = makeRepo();
+    write(dir, "sub/a.txt", "a\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "one");
+    const base = git("rev-parse", "HEAD");
+    write(dir, "\tlead.txt", "tab\n");
+    write(dir, "top.txt", "top\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "two");
+    git("config", "diff.relative", "true");
+
+    const changes = await listChanges(join(dir, "sub"), base, git("rev-parse", "HEAD"));
+    expect(changes.files.map((f) => f.path)).toEqual(["\tlead.txt", "top.txt"]);
+  });
+
+  it("rejects a commit id that is not in the repository", async () => {
+    const { dir, commit } = makeRepo();
+    commit("one");
+
+    expect((await refError(listChanges(dir, null, "0".repeat(40)))).code).toBe("unknown");
+  });
+
+  it("shows a merge commit's changes relative to its first parent", async () => {
+    const { dir, git, commit } = makeRepo();
+    commit("base");
+    git("switch", "-q", "-c", "side");
+    write(dir, "side.txt", "side\n");
+    git("add", "side.txt");
+    git("commit", "-q", "-m", "side");
+    git("switch", "-q", "main");
+    const main = commit("main");
+    git("merge", "-q", "--no-ff", "-m", "merge", "side");
+    const merge = git("rev-parse", "HEAD");
+
+    const changes = await listChanges(dir, main, merge);
+    expect(changes.files.map((f) => [f.path, f.status])).toEqual([["side.txt", "added"]]);
   });
 });

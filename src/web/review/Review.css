@@ -1,0 +1,24 @@
+.review {
+  --review-rail-width: 320px;
+  display: grid;
+  grid-template-columns: var(--review-rail-width) minmax(0, 1fr);
+  align-items: start;
+}
+
+.review__rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--ods-space-10) var(--ods-space-8);
+  border-right: 1px solid var(--ods-line);
+  box-sizing: border-box;
+}
+
+.review__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-10);
+  padding: var(--ods-space-10) var(--ods-space-12);
+  min-width: 0;
+}

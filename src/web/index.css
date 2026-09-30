@@ -32,3 +32,12 @@ a {
   color: var(--ods-fg-2);
   font-size: var(--ods-text-sm);
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

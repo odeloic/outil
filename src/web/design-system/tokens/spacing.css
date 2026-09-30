@@ -1,0 +1,20 @@
+:root {
+  --ods-space-1: 2px;
+  --ods-space-2: 4px;
+  --ods-space-3: 5px;
+  --ods-space-4: 6px;
+  --ods-space-5: 8px;
+  --ods-space-6: 9px;
+  --ods-space-7: 10px;
+  --ods-space-8: 12px;
+  --ods-space-9: 14px;
+  --ods-space-10: 16px;
+  --ods-space-11: 18px;
+  --ods-space-12: 20px;
+
+  --ods-radius-sm: 4px;
+  --ods-radius-md: 6px;
+  --ods-radius-lg: 8px;
+  --ods-radius-xl: 10px;
+  --ods-radius-pill: 999px;
+}

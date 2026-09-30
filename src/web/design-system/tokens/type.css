@@ -1,0 +1,18 @@
+:root {
+  --ods-font-ui: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --ods-font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --ods-text-2xs: 11px;
+  --ods-text-xs: 12px;
+  --ods-text-sm: 13px;
+  --ods-text-md: 14px;
+  --ods-text-lg: 15px;
+  --ods-text-xl: 19px;
+  --ods-text-2xl: 22px;
+  --ods-text-3xl: 34px;
+
+  --ods-weight-regular: 400;
+  --ods-weight-medium: 500;
+  --ods-weight-semibold: 600;
+  --ods-weight-bold: 700;
+}

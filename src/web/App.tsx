@@ -3,6 +3,7 @@ import type { ChangeSet, CommitDetails } from '../shared/api.ts'
 import { client, unwrap } from './api.ts'
 import { Note, Spinner } from './design-system'
 import { shortSha } from './format.ts'
+import { FileDiffView } from './diff/FileDiffView.tsx'
 import { CommitHeader } from './review/CommitHeader.tsx'
 import { FileList } from './review/FileList.tsx'
 import './review/Review.css'
@@ -58,6 +59,9 @@ function App() {
               <code>{shortSha(commit.parents[0])}</code>.
             </Note>
           )}
+          {changes.files.map((file) => (
+            <FileDiffView key={file.path} range={changes} file={file} />
+          ))}
         </main>
       </div>
     </>

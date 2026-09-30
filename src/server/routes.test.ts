@@ -11,6 +11,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     resolveCommit: unstubbed,
     getCommit: unstubbed,
     listChanges: unstubbed,
+    getFileDiff: unstubbed,
     ...overrides,
   });
 }
@@ -113,6 +114,79 @@ describe("GET /api/changes", () => {
 
     for (const query of ["", `head=main`, `head=${head}&base=HEAD~1`, `head=--all`, `head=${head.slice(0, 7)}`]) {
       const res = await app.request(`/api/changes?${query}`);
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("GET /api/file-diff", () => {
+  const head = "a".repeat(40);
+  const base = "b".repeat(40);
+
+  it("passes base, head, path, oldPath, and full through to getFileDiff", async () => {
+    const calls: Array<{ base: string | null; head: string; path: string; oldPath: string | null; full: boolean }> = [];
+    const app = makeApp({
+      getFileDiff: async (request) => {
+        calls.push(request);
+        return { kind: "binary" };
+      },
+    });
+
+    const res = await app.request(
+      `/api/file-diff?base=${base}&head=${head}&path=${encodeURIComponent("src/a.ts")}&oldPath=${encodeURIComponent("src/old.ts")}&full=1`,
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([{ base, head, path: "src/a.ts", oldPath: "src/old.ts", full: true }]);
+  });
+
+  it('passes full only when the query value is exactly "1"', async () => {
+    const calls: boolean[] = [];
+    const app = makeApp({
+      getFileDiff: async ({ full }) => {
+        calls.push(full);
+        return { kind: "binary" };
+      },
+    });
+
+    for (const full of ["0", "true", "01", "", undefined]) {
+      const query = full === undefined ? "" : `&full=${full}`;
+      await app.request(`/api/file-diff?head=${head}&path=file.txt${query}`);
+    }
+    expect(calls).toEqual([false, false, false, false, false]);
+  });
+
+  it("treats base as absent when it is not given", async () => {
+    const calls: Array<string | null> = [];
+    const app = makeApp({
+      getFileDiff: async ({ base }) => {
+        calls.push(base);
+        return { kind: "binary" };
+      },
+    });
+
+    await app.request(`/api/file-diff?head=${head}&path=file.txt`);
+    expect(calls).toEqual([null]);
+  });
+
+  it("rejects a missing, empty, or multi-line path with a 400", async () => {
+    const app = makeApp({});
+
+    for (const query of [`head=${head}`, `head=${head}&path=`, `head=${head}&path=a%0Ab`, `head=${head}&path=a&oldPath=b%0Ac`]) {
+      const res = await app.request(`/api/file-diff?${query}`);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("rejects a head or base that is not a full commit id", async () => {
+    const app = makeApp({});
+
+    for (const query of [
+      `head=main&path=file.txt`,
+      `head=${head.slice(0, 7)}&path=file.txt`,
+      `head=${head}&base=HEAD~1&path=file.txt`,
+      `head=${head}&base=${base.slice(0, 7)}&path=file.txt`,
+    ]) {
+      const res = await app.request(`/api/file-diff?${query}`);
       expect(res.status).toBe(400);
     }
   });

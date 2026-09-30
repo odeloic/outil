@@ -37,6 +37,33 @@ export type ChangeSet = {
   deletions: number
 }
 
+export type HunkLine = {
+  kind: "context" | "add" | "del"
+  text: string
+}
+
+export type Hunk = {
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  header: string
+  lines: HunkLine[]
+}
+
+export type FileDiffRequest = {
+  base: string | null
+  head: string
+  path: string
+  oldPath: string | null
+  full: boolean
+}
+
+export type FileDiff =
+  | { kind: "binary" }
+  | { kind: "too-large"; bytes: number }
+  | { kind: "text"; hunks: Hunk[]; oldText: string | null; newText: string | null }
+
 export type RefErrorCode = "empty-repo" | "unknown" | "ambiguous" | "not-a-commit" | "not-single"
 
 export type ApiError = {

@@ -71,15 +71,28 @@ export async function getCommit(cwd: string, sha: string): Promise<CommitDetails
 
 const STATUS: Record<string, FileChangeStatus> = { A: "added", D: "deleted", M: "modified", T: "modified", R: "renamed" };
 
+const emptyTrees = new Map<string, Promise<string>>();
+
 export function emptyTree(cwd: string): Promise<string> {
-  return git(cwd, "hash-object", "-t", "tree", "/dev/null");
+  let tree = emptyTrees.get(cwd);
+  if (!tree) {
+    tree = git(cwd, "hash-object", "-t", "tree", "/dev/null");
+    emptyTrees.set(cwd, tree);
+    tree.catch(() => emptyTrees.delete(cwd));
+  }
+  return tree;
 }
+
+const knownCommits = new Set<string>();
 
 export async function assertCommits(cwd: string, ...shas: string[]): Promise<void> {
   for (const sha of shas) {
+    const key = `${cwd}\0${sha}`;
+    if (knownCommits.has(key)) continue;
     if ((await tryGit(cwd, "rev-parse", "--verify", "--quiet", `${sha}^{commit}`)) === null) {
       throw new RefError("unknown", `Commit ${sha} does not exist in this repository.`);
     }
+    knownCommits.add(key);
   }
 }
 

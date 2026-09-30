@@ -31,6 +31,7 @@
     "dist"
   ],
   "scripts": {
+    "agents:sync": "node scripts/agents-sync.mjs",
     "dev": "vite",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build && vite build --ssr src/server/cli.ts --outDir dist/server",

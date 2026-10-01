@@ -1,6 +1,6 @@
 ---
 name: outil-design
-description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 20 approved primitives (Button, StatusChip, Avatar, etc.). Not for implementing Outil's actual product screens (review, threads, composer) — those aren't designed yet.
+description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 21 approved primitives (Button, StatusChip, Avatar, etc.). Not for implementing Outil's actual product screens (review, threads, composer) — those aren't designed yet.
 ---
 
 # Outil design system
@@ -45,7 +45,7 @@ Never invent a sixth state or restyle these five. Never rely on color alone — 
 
 ## Human vs agent (memorize this)
 
-Reviewer: dark square avatar with initials, plain message background. Agent: its logo tile (Claude clay `#D97757` with a white mark, Codex ink; light tile in dark mode), message tinted `--ods-sunken`. Logo and tint change together — never one without the other. The palette is neutral ink; there is no accent color.
+Reviewer: dark square avatar with initials, plain message background. Agent: the generic agent mark (the `agent` codicon on a `--ods-surface` tile with a 1px `--ods-line` ring, the same for every agent) next to the agent's name; the name is what tells agents apart, and no vendor logos ship. Its message is tinted `--ods-sunken`. Mark and tint change together — never one without the other. The palette is neutral ink; there is no accent color.
 
 ## Quick token reference
 
@@ -64,6 +64,6 @@ Reviewer: dark square avatar with initials, plain message background. Agent: its
 
 Codicons (`@vscode/codicons`, CC-BY-4.0) through the `Icon` primitive: chevron-down/right, arrow-swap, arrow-up/down, layout, check, add, warning, loading, comment-discussion. There are no sun/moon icons; the theme control is a text pill System / Light / Dark.
 
-## The 20 primitives
+## The 21 primitives
 
-`Button`, `SegmentedControl`, `Tabs`, `FilterPill` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar` (people) · `Popover`, `MenuOption` (overlay) · `Icon` (media)
+`Button`, `SegmentedControl`, `Tabs`, `FilterPill` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar`, `AgentLogo` (people) · `Popover`, `MenuOption` (overlay) · `Icon` (media)

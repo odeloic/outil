@@ -23,7 +23,7 @@ export function AgentChip({
 }) {
   return (
     <button ref={ref} type="button" className="agent-chip" aria-haspopup="dialog" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
-      {agent ? <AgentLabel agent={agent} model={model} effort={effort} /> : <span className="agent-label__model">No agent</span>}
+      {agent ? <AgentLabel agent={agent} model={model} effort={effort} /> : <span className="agent-label__name">No agent</span>}
       <Icon name="chevron-down" />
     </button>
   )

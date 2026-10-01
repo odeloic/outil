@@ -28,8 +28,6 @@
   --ods-syntax-number: #8A5700;
   --ods-syntax-comment: #686864;
   --ods-syntax-function: #2B4BB5;
-  --ods-logo-on-dark-display: block;
-  --ods-logo-on-light-display: none;
   --ods-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.08);
   color-scheme: light;
 }
@@ -65,8 +63,6 @@
     --ods-syntax-number: #E8B84A;
     --ods-syntax-comment: #92928E;
     --ods-syntax-function: #8FB0FF;
-    --ods-logo-on-dark-display: none;
-    --ods-logo-on-light-display: block;
     --ods-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
@@ -102,8 +98,6 @@
   --ods-syntax-number: #E8B84A;
   --ods-syntax-comment: #92928E;
   --ods-syntax-function: #8FB0FF;
-  --ods-logo-on-dark-display: none;
-  --ods-logo-on-light-display: block;
   --ods-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }

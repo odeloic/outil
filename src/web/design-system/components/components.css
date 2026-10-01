@@ -509,24 +509,13 @@
   flex: none;
   display: inline-grid;
   place-items: center;
+  box-sizing: border-box;
+  background: var(--ods-surface);
+  border: 1px solid var(--ods-line);
+  color: var(--ods-ink);
 }
-.ods-agent-logo--claude {
-  display: block;
-}
-.ods-agent-logo--codex {
-  background: var(--ods-ink);
-  color: var(--ods-on-ink);
-}
-.ods-agent-logo__mark {
-  grid-area: 1 / 1;
-  width: var(--ods-logo-mark);
-  height: var(--ods-logo-mark);
-}
-.ods-agent-logo__mark--on-dark {
-  display: var(--ods-logo-on-dark-display);
-}
-.ods-agent-logo__mark--on-light {
-  display: var(--ods-logo-on-light-display);
+.ods-agent-logo > .ods-icon.codicon {
+  font-size: var(--ods-logo-mark);
 }
 
 .ods-btn--primary .ods-kbd {
@@ -553,9 +542,8 @@
   height: var(--ods-logo-size-xs);
   border-radius: var(--ods-radius-sm);
 }
-.ods-agent-logo--xs .ods-agent-logo__mark {
-  width: var(--ods-logo-mark-xs);
-  height: var(--ods-logo-mark-xs);
+.ods-agent-logo--xs > .ods-icon.codicon {
+  font-size: var(--ods-logo-mark-xs);
 }
 .ods-agent-logo--md {
   width: var(--ods-logo-size-md);

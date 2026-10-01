@@ -38,7 +38,7 @@ export { Avatar } from './components/people/Avatar.tsx'
 export type { AvatarProps } from './components/people/Avatar.tsx'
 
 export { AgentLogo } from './components/people/AgentLogo.tsx'
-export type { AgentLogoProps, AgentLogoAgent } from './components/people/AgentLogo.tsx'
+export type { AgentLogoProps } from './components/people/AgentLogo.tsx'
 
 export { Popover } from './components/overlay/Popover.tsx'
 export type { PopoverProps } from './components/overlay/Popover.tsx'

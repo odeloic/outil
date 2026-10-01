@@ -10,7 +10,6 @@ export function AgentLabel({
   agent,
   model = null,
   effort = null,
-  name,
   note,
   size = 'sm',
   compact = false,
@@ -18,19 +17,22 @@ export function AgentLabel({
   agent: AgentId
   model?: string | null
   effort?: string | null
-  name?: string
   note?: string
   size?: Size
   compact?: boolean
 }) {
   const modelLabel = useModelLabel(agent, model)
+  const shownModel = modelLabel ?? model
   return (
     <span className={`agent-label agent-label--${size}${compact ? ' agent-label--compact' : ''}`}>
-      <AgentLogo agent={agent} label={AGENT_NAMES[agent]} size={size} />
+      <AgentLogo size={size} />
       <span className="agent-label__text">
-        <span className="agent-label__model">{name ?? modelLabel ?? model ?? AGENT_NAMES[agent]}</span>
+        <span className="agent-label__line">
+          <span className="agent-label__name">{AGENT_NAMES[agent]}</span>
+          {shownModel && <span className="agent-label__model">{shownModel}</span>}
+          {note && <span className="agent-label__note">{note}</span>}
+        </span>
         {effort && <span className="agent-label__effort">{effort}</span>}
-        {note && <span className="agent-label__note">{note}</span>}
       </span>
     </span>
   )

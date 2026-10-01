@@ -10,6 +10,7 @@ export type IconName =
   | 'warning'
   | 'loading'
   | 'comment-discussion'
+  | 'agent'
 
 export interface IconProps {
   name: IconName

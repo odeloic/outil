@@ -41,7 +41,7 @@ function AgentRow({ status, checked, onSelect }: { status: AgentStatus; checked:
   return (
     <li className="agent-picker__item">
       <button type="button" role="radio" aria-checked={checked} disabled={!ready} className="agent-picker__row agent-picker__row--agent" onClick={onSelect}>
-        <AgentLogo agent={status.id} label={status.name} size="xs" />
+        <AgentLogo size="xs" />
         <span className="agent-picker__row-name">{status.name}</span>
         {!ready && <Tag>{STATE_LABEL[status.state]}</Tag>}
         {checked && <Icon name="check" className="agent-picker__check" />}

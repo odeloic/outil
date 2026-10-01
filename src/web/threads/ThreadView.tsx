@@ -30,7 +30,7 @@ function AgentBubble({ message }: { message: AgentMessage }) {
   const label = useModelLabel(message.agent, message.model) ?? message.model
   return (
     <div className="thread-card__agent-bubble" title={`${AGENT_NAMES[message.agent]} · ${label}`}>
-      <AgentLabel agent={message.agent} name={AGENT_NAMES[message.agent]} note="replied" size="xs" />
+      <AgentLabel agent={message.agent} note="replied" size="xs" />
       <MessageBody body={message.body} />
     </div>
   )

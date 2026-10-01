@@ -24,6 +24,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     detectAgents: unstubbed,
     listModels: unstubbed,
     send: unstubbed,
+    cancelRun: unstubbed,
     markThreadRead: unstubbed,
     subscribeEvents: () => {
       throw new Error("not stubbed");
@@ -623,6 +624,69 @@ describe("POST /api/review/send", () => {
   });
 });
 
+describe("POST /api/review/runs/:id/cancel", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("cancels the run and returns the updated review", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      cancelRun: async (t, id) => {
+        calls.push([t, id]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/runs/r1/cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "r1"]]);
+  });
+
+  it("rejects a request with no target", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/api/review/runs/r1/cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for an unknown run id", async () => {
+    const app = makeApp({
+      cancelRun: async () => {
+        throw new ReviewError(404, "No run with id r1.");
+      },
+    });
+
+    const res = await app.request("/api/review/runs/r1/cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 when the run is not in progress", async () => {
+    const app = makeApp({
+      cancelRun: async () => {
+        throw new ReviewError(409, "This run is not in progress.");
+      },
+    });
+
+    const res = await app.request("/api/review/runs/r1/cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(409);
+  });
+});
+
 describe("POST /api/review/threads/:id/read", () => {
   const target: ReviewTarget = { kind: "commit", sha };
 
@@ -750,7 +814,7 @@ describe("GET /api/review/events", () => {
   const target: ReviewTarget = { kind: "commit", sha };
 
   it("sends the current review, then replays buffered activity, on connect", async () => {
-    const activity: ActivityEvent = { runId: "r1", text: "Reading a.ts", at: "d" };
+    const activity: ActivityEvent = { runId: "r1", seq: 1, text: "Reading a.ts", at: "d" };
     const subscriptions: EventHandlers[] = [];
     const app = makeApp({
       getReview: async (t) => emptyReview(t),
@@ -771,6 +835,30 @@ describe("GET /api/review/events", () => {
     expect(events[1]).toContain(JSON.stringify(activity));
   });
 
+  it("subscribes before fetching the review to serve, so an update landing in between is not lost", async () => {
+    let handlers: EventHandlers | undefined;
+    const app = makeApp({
+      getReview: async (t) => emptyReview(t),
+      subscribeEvents: (_key, h) => {
+        handlers = h;
+        queueMicrotask(() => handlers!.onReview({ ...emptyReview(target), revision: 7 }));
+        return { activity: [], unsubscribe: () => {} };
+      },
+    });
+
+    const res = await app.request(`/api/review/events?commit=${sha}`);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!text.includes('"revision":7')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    expect(text).toContain('"revision":7');
+    await reader.cancel();
+  });
+
   it("streams a later review and activity event as they are published", async () => {
     let handlers: EventHandlers | undefined;
     const app = makeApp({
@@ -787,7 +875,7 @@ describe("GET /api/review/events", () => {
 
     const updated = { ...emptyReview(target), revision: 1 };
     handlers!.onReview(updated);
-    const activity: ActivityEvent = { runId: "r1", text: "Thinking", at: "d" };
+    const activity: ActivityEvent = { runId: "r1", seq: 1, text: "Thinking", at: "d" };
     handlers!.onActivity(activity);
 
     const decoder = new TextDecoder();

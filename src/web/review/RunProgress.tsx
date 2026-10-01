@@ -2,18 +2,28 @@ import { useState } from 'react'
 import type { Run } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
 import { useModelLabel } from '../agents/useAgentModels.ts'
-import { Button, Spinner } from '../design-system'
+import { Button, Note, Spinner } from '../design-system'
 import { useElapsedLabel } from './elapsed.ts'
 import { useRunActivity } from './runActivity.ts'
 import './RunProgress.css'
 
-export function RunProgress({ run }: { run: Run }) {
+export function RunProgress({ run, onCancel }: { run: Run; onCancel: () => Promise<unknown> }) {
   const [expanded, setExpanded] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const modelLabel = useModelLabel(run.agent, run.model)
   const elapsed = useElapsedLabel(run.startedAt)
   const activity = useRunActivity(run.id)
   const latest = activity.at(-1) ?? null
   const threadCount = run.threadIds.length
+
+  const handleCancel = () => {
+    setCancelling(true)
+    setCancelError(null)
+    onCancel()
+      .catch((err: unknown) => setCancelError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setCancelling(false))
+  }
 
   return (
     <div className="run-progress" id="review-run-progress">
@@ -23,7 +33,11 @@ export function RunProgress({ run }: { run: Run }) {
           {AGENT_NAMES[run.agent]} · {modelLabel ?? run.model} is reviewing {threadCount} {threadCount === 1 ? 'thread' : 'threads'}
         </span>
         <span className="run-progress__elapsed">{elapsed}</span>
+        <Button variant="ghost" onClick={handleCancel} disabled={cancelling} className="run-progress__cancel">
+          {cancelling ? 'Cancelling…' : 'Cancel'}
+        </Button>
       </div>
+      {cancelError && <Note variant="failure">{cancelError}</Note>}
       {latest && (
         <p className="run-progress__activity-line" aria-live="polite">
           {latest.text}

@@ -13,6 +13,7 @@ import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
 import { jumpToFile, resetNavigation, useCurrentFile } from './navigation.ts'
+import { RunEndNote } from './RunEndNote.tsx'
 import { RunProgress } from './RunProgress.tsx'
 import { useReview } from './useReview.ts'
 import { useViewedFiles } from './viewed.ts'
@@ -22,7 +23,7 @@ type RailTab = 'files' | 'history'
 
 const NO_THREADS: Thread[] = []
 const NO_RUNS: Run[] = []
-const FAILURE_STATES = new Set<Run['state']>(['failed', 'timed-out', 'cancelled', 'interrupted'])
+const FAILURE_STATES = new Set<Run['state']>(['failed', 'timed-out', 'interrupted'])
 
 function sendLabel(drafts: number): string {
   if (drafts === 0) return 'Send drafts'
@@ -35,11 +36,13 @@ function SendPanel({
   drafts,
   runs,
   send,
+  cancel,
 }: {
   threads: Thread[]
   drafts: number
   runs: Run[]
   send: (agent: AgentId, model: string) => Promise<ReviewData>
+  cancel: (runId: string) => Promise<ReviewData>
 }) {
   const { agent, model, modelsLoading, modelsError } = useAgentChoice()
   const [sending, setSending] = useState(false)
@@ -72,7 +75,9 @@ function SendPanel({
       .finally(() => setSending(false))
   }
 
-  const describedBy = runningRun ? 'review-run-progress' : reason ? 'review-send-reason' : undefined
+  const endNoteShown = latestRun?.state === 'cancelled'
+  const shownReason = endNoteShown && drafts === 0 ? null : reason
+  const describedBy = runningRun ? 'review-run-progress' : shownReason ? 'review-send-reason' : undefined
 
   return (
     <div className="review__send">
@@ -80,11 +85,11 @@ function SendPanel({
         {sending ? 'Sending…' : sendLabel(drafts)}
       </Button>
       {runningRun ? (
-        <RunProgress run={runningRun} />
+        <RunProgress run={runningRun} onCancel={() => cancel(runningRun.id)} />
       ) : (
-        reason && (
+        shownReason && (
           <p id="review-send-reason" className="review__send-reason">
-            {reason}
+            {shownReason}
           </p>
         )
       )}
@@ -105,6 +110,16 @@ function SendPanel({
             {latestRun.summary && <p className="review__run-summary-text">{latestRun.summary}</p>}
           </div>
         </div>
+      )}
+      {endNoteShown && (
+        <RunEndNote
+          variant="default"
+          message="Run cancelled. Your comments are kept."
+          actionLabel="Send again"
+          onAction={handleSend}
+          pending={sending}
+          disabled={!agent || !model}
+        />
       )}
       {latestRun && FAILURE_STATES.has(latestRun.state) && <Note variant="failure">{latestRun.error ?? 'The run did not finish.'}</Note>}
     </div>
@@ -143,7 +158,7 @@ export function Review({
   const collapsedOverrides = overrides.key === reviewKey ? overrides.map : new Map<string, boolean>()
   const [railTab, setRailTab] = useState<RailTab>('files')
   const current = useCurrentFile(changes.files.length)
-  const { review, error, reviewer, createThread, editDraft, deleteDraft, send, markRead } = useReview(reviewTarget)
+  const { review, error, reviewer, createThread, editDraft, deleteDraft, send, cancel, markRead } = useReview(reviewTarget)
   const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
   const threadsByPath = useMemo(() => {
     const map = new Map<string, Thread[]>()
@@ -192,7 +207,7 @@ export function Review({
             <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
             {error && <Note variant="failure">{error}</Note>}
             <AgentPanel />
-            <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} />
+            <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
           </div>
           <Tabs<RailTab>
             tabs={[

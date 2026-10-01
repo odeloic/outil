@@ -6,21 +6,30 @@ const EMPTY: ActivityEvent[] = []
 
 const lines = new Map<string, ActivityEvent[]>()
 const listeners = new Map<string, Set<() => void>>()
+const lastSeq = new Map<string, number>()
 
 function notify(runId: string) {
   listeners.get(runId)?.forEach((listener) => listener())
 }
 
 export function recordActivity(event: ActivityEvent) {
+  const last = lastSeq.get(event.runId) ?? 0
+  if (event.seq <= last) return
+  lastSeq.set(event.runId, event.seq)
   const next = [...(lines.get(event.runId) ?? []), event].slice(-MAX_LINES)
   lines.set(event.runId, next)
   notify(event.runId)
 }
 
 export function clearRunActivity(runId: string) {
+  lastSeq.delete(runId)
   if (!lines.has(runId)) return
   lines.delete(runId)
   notify(runId)
+}
+
+export function getRunActivity(runId: string): ActivityEvent[] {
+  return lines.get(runId) ?? EMPTY
 }
 
 function subscribeTo(runId: string, listener: () => void) {
@@ -41,6 +50,6 @@ export function useRunActivity(runId: string | null): ActivityEvent[] {
     },
     [runId],
   )
-  const getSnapshot = useCallback(() => (runId ? (lines.get(runId) ?? EMPTY) : EMPTY), [runId])
+  const getSnapshot = useCallback(() => (runId ? getRunActivity(runId) : EMPTY), [runId])
   return useSyncExternalStore(subscribe, getSnapshot)
 }

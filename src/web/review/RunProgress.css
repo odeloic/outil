@@ -29,6 +29,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.run-progress__cancel {
+  flex: none;
+}
+
 .run-progress__activity-line {
   margin: 0;
   font-family: var(--ods-font-mono);

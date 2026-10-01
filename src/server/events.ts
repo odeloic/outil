@@ -16,6 +16,7 @@ const MAX_ACTIVITY = 50;
 type Hub = {
   subscribers: Set<EventHandlers>;
   activity: Map<string, ActivityEvent[]>;
+  seq: Map<string, number>;
 };
 
 const hubs = new Map<string, Hub>();
@@ -27,7 +28,7 @@ function existingHub(key: string): Hub | undefined {
 function hub(key: string): Hub {
   let found = hubs.get(key);
   if (!found) {
-    found = { subscribers: new Set(), activity: new Map() };
+    found = { subscribers: new Set(), activity: new Map(), seq: new Map() };
     hubs.set(key, found);
   }
   return found;
@@ -41,18 +42,24 @@ export function publishReview(key: string, review: Review): void {
   const found = existingHub(key);
   if (!found) return;
   for (const run of review.runs) {
-    if (run.state !== "running") found.activity.delete(run.id);
+    if (run.state !== "running") {
+      found.activity.delete(run.id);
+      found.seq.delete(run.id);
+    }
   }
   for (const subscriber of found.subscribers) subscriber.onReview(review);
   pruneIfEmpty(key, found);
 }
 
-export function publishActivity(key: string, event: ActivityEvent): void {
+export function publishActivity(key: string, event: Omit<ActivityEvent, "seq">): void {
   const found = hub(key);
+  const seq = (found.seq.get(event.runId) ?? 0) + 1;
+  found.seq.set(event.runId, seq);
+  const withSeq: ActivityEvent = { ...event, seq };
   const lines = found.activity.get(event.runId) ?? [];
-  lines.push(event);
+  lines.push(withSeq);
   found.activity.set(event.runId, lines.length > MAX_ACTIVITY ? lines.slice(-MAX_ACTIVITY) : lines);
-  for (const subscriber of found.subscribers) subscriber.onActivity(event);
+  for (const subscriber of found.subscribers) subscriber.onActivity(withSeq);
 }
 
 export function subscribe(key: string, handlers: EventHandlers): Subscription {

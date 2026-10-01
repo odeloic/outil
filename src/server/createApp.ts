@@ -62,6 +62,7 @@ export function createApp(cwd: string) {
     detectAgents: (refresh) => agentCache.list(refresh),
     listModels: (agent) => listModels(agent),
     send: (target, agent, model) => runner.send(target, agent, model),
+    cancelRun: (target, id) => runner.cancel(target, id),
     markThreadRead: (target, id) => store.update(target, (review) => markThreadRead(review, id)),
     subscribeEvents: subscribe,
   });

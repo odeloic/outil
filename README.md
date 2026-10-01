@@ -41,6 +41,11 @@ machine, is never part of the repository's history, and never shows up in
 inside the directory `git rev-parse --git-common-dir` prints, for a
 worktree).
 
+Live run progress (activity, elapsed time, cancel) is kept in memory per
+`outil` process, so a run started from another `outil` instance on the same
+repository — for example from a worktree — only shows its result after a
+reload, once it has finished and been persisted.
+
 ## Requirements
 
 - Node.js 24 or newer

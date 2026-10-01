@@ -42,6 +42,7 @@ export type RouteDeps = {
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
   send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
+  cancelRun: (target: ReviewTarget, id: string) => Promise<Review>;
   markThreadRead: (target: ReviewTarget, id: string) => Promise<Review>;
   subscribeEvents: (key: string, handlers: EventHandlers) => Subscription;
 };
@@ -212,6 +213,7 @@ export function createRoutes({
   detectAgents,
   listModels,
   send,
+  cancelRun,
   markThreadRead,
   subscribeEvents,
 }: RouteDeps) {
@@ -362,6 +364,14 @@ export function createRoutes({
         return c.json(...reviewFailure(err));
       }
     })
+    .post("/api/review/runs/:id/cancel", targetOnlyBody, async (c) => {
+      const { target } = c.req.valid("json");
+      try {
+        return c.json(await cancelRun(target, c.req.param("id")), 200);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
+      }
+    })
     .post("/api/review/threads/:id/read", targetOnlyBody, async (c) => {
       const { target } = c.req.valid("json");
       try {
@@ -372,18 +382,19 @@ export function createRoutes({
     })
     .get("/api/review/events", reviewQuery, async (c) => {
       const target = reviewTargetFromQuery(c.req.valid("query"));
-      let initial: Review;
+      let key: string;
       try {
-        initial = await getReview(target);
+        key = (await getReview(target)).key;
       } catch (err) {
         return c.json(...reviewFailure(err));
       }
       return streamSSE(c, async (stream) => {
-        const key = initial.key;
         let heartbeat: ReturnType<typeof setInterval> | null = null;
         let subscription: Subscription | null = null;
+        let isAborted = false;
         const aborted = new Promise<void>((resolve) => {
           stream.onAbort(() => {
+            isAborted = true;
             if (heartbeat) clearInterval(heartbeat);
             subscription?.unsubscribe();
             resolve();
@@ -394,13 +405,15 @@ export function createRoutes({
             void stream.writeSSE({ event: "review", data: JSON.stringify(review) });
           },
           onActivity: (event: ActivityEvent) => {
-            void stream.writeSSE({ event: "activity", data: JSON.stringify(event) });
+            void stream.writeSSE({ event: "activity", data: JSON.stringify(event), id: String(event.seq) });
           },
         });
-        await stream.writeSSE({ event: "review", data: JSON.stringify(initial) });
+        const current = await getReview(target).catch(() => null);
+        if (current) await stream.writeSSE({ event: "review", data: JSON.stringify(current) });
         for (const event of subscription.activity) {
-          await stream.writeSSE({ event: "activity", data: JSON.stringify(event) });
+          await stream.writeSSE({ event: "activity", data: JSON.stringify(event), id: String(event.seq) });
         }
+        if (isAborted) return;
         heartbeat = setInterval(() => void stream.write(": ping\n\n"), HEARTBEAT_MS);
         await aborted;
       });

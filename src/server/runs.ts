@@ -15,6 +15,7 @@ export type RunnerDeps = {
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
   context: (review: Review) => Promise<PromptContext>;
   timeoutMs?: number;
+  cancelWaitMs?: number;
   onChange?: (key: string) => void;
   onActivity?: (key: string, runId: string, text: string) => void;
   isAlivePid?: (pid: number) => boolean;
@@ -23,11 +24,14 @@ export type RunnerDeps = {
 export type Runner = {
   send(target: ReviewTarget, agent: AgentId, model: string): Promise<Review>;
   get(target: ReviewTarget): Promise<Review>;
+  cancel(target: ReviewTarget, runId: string): Promise<Review>;
   stopAll(): Promise<void>;
 };
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const STALE_MARGIN_MS = 60 * 1000;
+const CANCEL_WAIT_MS = 10 * 1000;
+const CANCELLED_BY_REVIEWER_MESSAGE = "Cancelled by the reviewer.";
 const INTERRUPTED_MESSAGE = "Outil stopped before the agent answered.";
 
 function defaultIsAlivePid(pid: number): boolean {
@@ -58,7 +62,7 @@ function stateForError(err: unknown): Exclude<RunState, "running" | "interrupted
 
 type Outcome = { kind: "done"; answer: ParsedAnswer } | { kind: "error"; err: unknown };
 
-function applyOutcome(review: Review, runId: string, outcome: Outcome): Review {
+function applyOutcome(review: Review, runId: string, outcome: Outcome, cancelMessage?: string): Review {
   const now = new Date().toISOString();
   const run = review.runs.find((candidate) => candidate.id === runId);
   if (!run) return review;
@@ -87,7 +91,8 @@ function applyOutcome(review: Review, runId: string, outcome: Outcome): Review {
   }
 
   const state = stateForError(outcome.err);
-  const message = outcome.err instanceof Error ? outcome.err.message : String(outcome.err);
+  const message =
+    state === "cancelled" && cancelMessage ? cancelMessage : outcome.err instanceof Error ? outcome.err.message : String(outcome.err);
   const runs = review.runs.map((candidate) => (candidate.id === runId ? { ...candidate, state, error: message, endedAt: now } : candidate));
   return { ...review, runs };
 }
@@ -99,6 +104,7 @@ export function createRunner({
   listModels,
   context,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cancelWaitMs = CANCEL_WAIT_MS,
   onChange,
   onActivity,
   isAlivePid = defaultIsAlivePid,
@@ -108,6 +114,7 @@ export function createRunner({
   const instance = crypto.randomUUID();
   const live = new Map<string, { controller: AbortController; done: Promise<void> }>();
   const pending = new Set<string>();
+  const reviewerCancelled = new Set<string>();
   const staleAfterMs = timeoutMs + STALE_MARGIN_MS;
 
   function isOwnerAlive(run: Run): boolean {
@@ -138,12 +145,14 @@ export function createRunner({
   }
 
   async function finish(target: ReviewTarget, key: string, runId: string, outcome: Outcome): Promise<void> {
+    const cancelMessage = reviewerCancelled.has(runId) ? CANCELLED_BY_REVIEWER_MESSAGE : undefined;
     try {
-      await store.update(target, (review) => applyOutcome(review, runId, outcome));
+      await store.update(target, (review) => applyOutcome(review, runId, outcome, cancelMessage));
     } catch (err) {
       console.error(`outil: failed to record the outcome of run ${runId} for ${key}:`, err);
     }
     live.delete(runId);
+    reviewerCancelled.delete(runId);
     notifyChange(key);
   }
 
@@ -240,6 +249,20 @@ export function createRunner({
     },
     get(target) {
       return reconcileStored(target);
+    },
+    async cancel(target, runId) {
+      const review = await reconcileStored(target);
+      const run = review.runs.find((candidate) => candidate.id === runId);
+      if (!run) throw new ReviewError(404, `No run with id ${runId}.`);
+      const entry = live.get(runId);
+      if (run.state !== "running") throw new ReviewError(409, "This run is not in progress.");
+      if (!entry) {
+        throw new ReviewError(409, "This run was started from another Outil window and can only be cancelled there.");
+      }
+      reviewerCancelled.add(runId);
+      entry.controller.abort();
+      await Promise.race([entry.done, new Promise<void>((resolve) => setTimeout(resolve, cancelWaitMs))]);
+      return store.get(target);
     },
     stopAll() {
       const entries = [...live.values()];

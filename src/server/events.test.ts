@@ -69,6 +69,24 @@ describe("publishActivity", () => {
     publishReview(key, review(key, { runs: [{ ...runningRun("r1"), state: "done", endedAt: "d" }] }));
   });
 
+  it("assigns each activity line a per-run increasing seq, independent of another run's count", () => {
+    const key = uniqueKey();
+    const seen: number[] = [];
+    const sub = subscribe(key, { onReview: () => {}, onActivity: (event) => seen.push(event.seq) });
+
+    publishActivity(key, { runId: "r1", text: "a", at: "d1" });
+    publishActivity(key, { runId: "r2", text: "x", at: "d1" });
+    publishActivity(key, { runId: "r1", text: "b", at: "d2" });
+    publishActivity(key, { runId: "r1", text: "c", at: "d3" });
+
+    expect(seen).toEqual([1, 1, 2, 3]);
+
+    const late = subscribe(key, { onReview: () => {}, onActivity: () => {} });
+    expect(late.activity.filter((e) => e.runId === "r1").map((e) => e.seq)).toEqual([1, 2, 3]);
+    late.unsubscribe();
+    sub.unsubscribe();
+  });
+
   it("keeps only the last 50 activity lines per run", () => {
     const key = uniqueKey();
     for (let i = 0; i < 60; i++) publishActivity(key, { runId: "r1", text: `line ${i}`, at: String(i) });

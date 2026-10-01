@@ -287,3 +287,74 @@ describe("createRunner background run", () => {
     expect(run.endedAt).not.toBeNull();
   });
 });
+
+describe("createRunner.cancel", () => {
+  function abortableAsk(): AskFn {
+    return (options) =>
+      new Promise((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () => reject(new AgentRunError("cancelled", "The run was cancelled.")));
+      });
+  }
+
+  it("rejects with 404 for an unknown run id", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { runner } = makeRunner({ store });
+
+    await expect(runner.cancel(target, "no-such-run")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rejects with 409 when the run has already finished", async () => {
+    const done: Run = { ...runOwnedBy({}), id: "r1", state: "done", endedAt: "d" };
+    const store = makeStore(makeReview([sentThread("t1")], [done]));
+    const { runner } = makeRunner({ store });
+
+    await expect(runner.cancel(target, "r1")).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("rejects with 409 for a run that is running but not owned by this process", async () => {
+    const live = runOwnedBy({ owner: { pid: process.ppid, instance: "other-instance" } });
+    const store = makeStore(makeReview([sentThread("t1")], [live]));
+    const { runner } = makeRunner({ store });
+
+    await expect(runner.cancel(target, "stale")).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("aborts the live run and resolves once it is persisted as cancelled, with a reviewer-facing message", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { runner } = makeRunner({ store, ask: abortableAsk() });
+
+    const sent = await runner.send(target, "claude", "haiku");
+    const runId = sent.runs[0].id;
+
+    const review = await runner.cancel(target, runId);
+    const run = review.runs.find((candidate) => candidate.id === runId)!;
+    expect(run.state).toBe("cancelled");
+    expect(run.error).toBe("Cancelled by the reviewer.");
+    expect(run.endedAt).not.toBeNull();
+    expect(threadStatus(review.threads[0], review.runs)).toBe("failed");
+  });
+
+  it("gives up waiting after cancelWaitMs and returns the review as it currently stands", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const ask: AskFn = () => new Promise(() => {});
+    const { runner } = makeRunner({ store, ask, cancelWaitMs: 50 });
+
+    const sent = await runner.send(target, "claude", "haiku");
+    const runId = sent.runs[0].id;
+
+    const review = await runner.cancel(target, runId);
+    expect(review.runs.find((candidate) => candidate.id === runId)?.state).toBe("running");
+  });
+
+  it("a cancelled run's threads can be sent again", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { runner } = makeRunner({ store, ask: abortableAsk() });
+
+    const sent = await runner.send(target, "claude", "haiku");
+    await runner.cancel(target, sent.runs[0].id);
+
+    const review = await runner.send(target, "claude", "haiku");
+    expect(review.runs.at(-1)?.state).toBe("running");
+    expect(review.runs.at(-1)?.threadIds).toEqual(["t1"]);
+  });
+});

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActivityEvent, AgentId, Review, ReviewTarget, ThreadAnchor } from '../../shared/api.ts'
 import { ApiRequestError, client, unwrap } from '../api.ts'
+import { nextBackoffMs } from './reconnect.ts'
 import { clearRunActivity, recordActivity } from './runActivity.ts'
 
 export function targetKey(target: ReviewTarget): string {
@@ -15,6 +16,7 @@ export function pickReview(prev: KeyedReview | null, key: string, review: Review
 }
 
 const MESSAGE_GONE = 'This comment no longer exists.'
+const DISCONNECTED_MESSAGE = 'Lost connection to the review. Reconnecting…'
 
 export type UseReview = {
   review: Review | null
@@ -24,6 +26,7 @@ export type UseReview = {
   editDraft: (id: string, body: string) => Promise<Review>
   deleteDraft: (id: string) => Promise<Review>
   send: (agent: AgentId, model: string) => Promise<Review>
+  cancel: (runId: string) => Promise<Review>
   markRead: (threadId: string) => Promise<Review>
 }
 
@@ -72,7 +75,12 @@ export function useReview(target: ReviewTarget): UseReview {
     const current = targetRef.current
     const query: Record<string, string> =
       current.kind === 'commit' ? { commit: current.sha } : { base: current.base, head: current.head }
-    const source = new EventSource(`/api/review/events?${new URLSearchParams(query)}`)
+    const url = `/api/review/events?${new URLSearchParams(query)}`
+
+    let source: EventSource | null = null
+    let backoffTimer: ReturnType<typeof setTimeout> | null = null
+    let attempt = 0
+    let stopped = false
 
     const onReview = (event: MessageEvent<string>) => {
       let review: Review
@@ -95,14 +103,38 @@ export function useReview(target: ReviewTarget): UseReview {
       }
     }
 
-    source.addEventListener('review', onReview)
-    source.addEventListener('activity', onActivity)
-    return () => {
-      source.removeEventListener('review', onReview)
-      source.removeEventListener('activity', onActivity)
-      source.close()
+    const open = () => {
+      const es = new EventSource(url)
+      source = es
+      es.addEventListener('review', onReview)
+      es.addEventListener('activity', onActivity)
+      es.onopen = () => {
+        attempt = 0
+      }
+      es.onerror = () => {
+        if (stopped || es.readyState !== EventSource.CLOSED) return
+        setErrorState({ key: dispatchKey, message: DISCONNECTED_MESSAGE })
+        void fetchReview(dispatchKey)
+        es.removeEventListener('review', onReview)
+        es.removeEventListener('activity', onActivity)
+        const wait = nextBackoffMs(attempt)
+        attempt += 1
+        backoffTimer = setTimeout(() => {
+          if (!stopped) open()
+        }, wait)
+      }
     }
-  }, [key, applyResponse])
+
+    open()
+
+    return () => {
+      stopped = true
+      if (backoffTimer) clearTimeout(backoffTimer)
+      source?.removeEventListener('review', onReview)
+      source?.removeEventListener('activity', onActivity)
+      source?.close()
+    }
+  }, [key, applyResponse, fetchReview])
 
   useEffect(() => {
     let cancelled = false
@@ -164,6 +196,12 @@ export function useReview(target: ReviewTarget): UseReview {
     [applyMutation],
   )
 
+  const cancel = useCallback(
+    (runId: string) =>
+      applyMutation(unwrap(client.api.review.runs[':id'].cancel.$post({ param: { id: runId }, json: { target: targetRef.current } }))),
+    [applyMutation],
+  )
+
   const markRead = useCallback(
     (threadId: string) =>
       applyMutation(
@@ -180,6 +218,7 @@ export function useReview(target: ReviewTarget): UseReview {
     editDraft,
     deleteDraft,
     send,
+    cancel,
     markRead,
   }
 }

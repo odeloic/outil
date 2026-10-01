@@ -187,6 +187,7 @@ export type Review = {
 
 export type ActivityEvent = {
   runId: string
+  seq: number
   text: string
   at: string
 }

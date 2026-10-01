@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { LineSide, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
-import { Button } from '../design-system'
+import { Button, Icon } from '../design-system'
 import { PendingThreadCard, ThreadView } from '../threads/ThreadView.tsx'
 import type { HeightStore } from './heightStore.ts'
 import type { Token } from './highlight.ts'
@@ -218,12 +218,12 @@ function Gap({ row, onExpand, mirror = false }: { row: GapRow; onExpand: ExpandG
       <span className="diff__gap-actions">
         {row.canExpandDown && row.hidden > EXPAND_STEP && (
           <Button variant="ghost" onClick={() => onExpand(row.index, { fromTop: step })}>
-            ↓ Show {step} lines
+            <Icon name="arrow-down" /> Show {step} lines
           </Button>
         )}
         {row.canExpandUp && row.hidden > EXPAND_STEP && (
           <Button variant="ghost" onClick={() => onExpand(row.index, { fromBottom: step })}>
-            ↑ Show {step} lines
+            <Icon name="arrow-up" /> Show {step} lines
           </Button>
         )}
         <Button variant="ghost" onClick={() => onExpand(row.index, 'all')}>

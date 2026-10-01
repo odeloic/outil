@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { FileChange, FileDiff, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { client, unwrap } from '../api.ts'
-import { Button, Checkbox, CountBadge, DiffStat, FileStatusBadge, Spinner, Tag } from '../design-system'
+import { Button, Checkbox, CountBadge, DiffStat, FileStatusBadge, Icon, Spinner, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import { fileAnchor } from '../review/navigation.ts'
 import { BodyNote } from './BodyNote.tsx'
@@ -158,7 +158,7 @@ export const FileDiffView = memo(function FileDiffView({
           aria-label={collapsed ? `Expand ${file.path}` : `Collapse ${file.path}`}
           onClick={() => onCollapse(file.path, !collapsed)}
         >
-          <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
         </Button>
         <FileStatusBadge status={FILE_STATUS_BADGE[file.status]} />
         <span className="file-diff__path">

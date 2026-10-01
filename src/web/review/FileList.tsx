@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import type { ChangeSet, FileChange, Thread } from '../../shared/api.ts'
-import { CountBadge, DiffStat, FileStatusBadge, ProgressBar, Tag } from '../design-system'
+import { CountBadge, DiffStat, FileStatusBadge, Icon, ProgressBar, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
 import { revealInScrollParent } from './navigation.ts'
 import './FileList.css'
@@ -11,7 +11,7 @@ function FilePath({ path }: { path: string }) {
   return (
     <span className="file-list__path">
       {slash >= 0 && <span className="file-list__dir">{path.slice(0, slash + 1)}</span>}
-      {path.slice(slash + 1)}
+      <span className="file-list__base">{path.slice(slash + 1)}</span>
     </span>
   )
 }
@@ -58,14 +58,18 @@ const FileRow = memo(function FileRow({
           )}
           <FilePath path={file.path} />
         </span>
-        {viewed && (
-          <span className="file-list__viewed">
-            <span aria-hidden="true">✓</span>
-            <span className="visually-hidden">viewed</span>
-          </span>
-        )}
-        {commentCount > 0 && <CountBadge count={commentCount} title={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`} />}
-        {file.binary ? <Tag>Binary</Tag> : <DiffStat added={file.additions} removed={file.deletions} />}
+        <span className="file-list__viewed">
+          {viewed && (
+            <>
+              <Icon name="check" />
+              <span className="visually-hidden">viewed</span>
+            </>
+          )}
+        </span>
+        <span className="file-list__count">
+          {commentCount > 0 && <CountBadge count={commentCount} title={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`} />}
+        </span>
+        <span className="file-list__stat">{file.binary ? <Tag>Binary</Tag> : <DiffStat added={file.additions} removed={file.deletions} />}</span>
       </button>
     </li>
   )

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AgentMessage, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
 import { threadStatus } from '../../shared/review.ts'
+import { AgentLabel } from '../agents/AgentLabel.tsx'
 import { useModelLabel } from '../agents/useAgentModels.ts'
 import { Avatar, Button, Note, StatusChip } from '../design-system'
 import { threadCardId } from '../review/navigation.ts'
@@ -28,12 +29,9 @@ type Props = {
 function AgentBubble({ message }: { message: AgentMessage }) {
   const label = useModelLabel(message.agent, message.model) ?? message.model
   return (
-    <div className="thread-card__message">
-      <Avatar kind="agent" />
-      <div className="thread-card__agent-bubble">
-        <p className="thread-card__agent-header">{`${AGENT_NAMES[message.agent]} · ${label}`}</p>
-        <MessageBody body={message.body} />
-      </div>
+    <div className="thread-card__agent-bubble" title={`${AGENT_NAMES[message.agent]} · ${label}`}>
+      <AgentLabel agent={message.agent} name={AGENT_NAMES[message.agent]} note="replied" size="xs" />
+      <MessageBody body={message.body} />
     </div>
   )
 }
@@ -182,13 +180,16 @@ export function ThreadView({
       {resolveError && <Note variant="failure">{resolveError}</Note>}
       {thread.messages.map((message) =>
         editingId === message.id ? (
-          <Composer
-            key={message.id}
-            initialBody={message.body}
-            onSave={(body) => onSaveEdit(message.id, body, thread.anchor)}
-            onCancel={() => onCancelEdit(thread.anchor)}
-            ariaLabel={`Edit comment on ${label}`}
-          />
+          <div className="thread-card__draft-card" key={message.id}>
+            <span className="thread-card__draft-title">Edit draft</span>
+            <Composer
+              initialBody={message.body}
+              onSave={(body) => onSaveEdit(message.id, body, thread.anchor)}
+              onCancel={() => onCancelEdit(thread.anchor)}
+              ariaLabel={`Edit comment on ${label}`}
+              hint
+            />
+          </div>
         ) : message.author === 'agent' ? (
           <AgentBubble key={message.id} message={message} />
         ) : (
@@ -217,7 +218,10 @@ export function ThreadView({
       {canReply &&
         !thread.resolved &&
         (replying ? (
-          <Composer onSave={handleReplySave} onCancel={handleReplyCancel} ariaLabel={`Reply on ${label}`} />
+          <div className="thread-card__draft-card">
+            <span className="thread-card__draft-title">New reply</span>
+            <Composer onSave={handleReplySave} onCancel={handleReplyCancel} ariaLabel={`Reply on ${label}`} hint />
+          </div>
         ) : (
           <Button className="thread-card__reply-button" variant="ghost" onClick={() => setReplying(true)} aria-label={`Reply on ${label}`}>
             Reply
@@ -238,8 +242,10 @@ export function PendingThreadCard({ anchor, onSave, onCancel }: PendingProps) {
   return (
     <div className="thread-card thread-card--draft">
       <div className="thread-card__header">
-        <StatusChip status="draft" />
-        <span className="thread-card__anchor">{label}</span>
+        <span className="thread-card__draft-title">
+          New draft · {label.charAt(0).toLowerCase()}
+          {label.slice(1)}
+        </span>
       </div>
       <Composer onSave={onSave} onCancel={onCancel} ariaLabel={`Comment on ${label}`} hint />
     </div>

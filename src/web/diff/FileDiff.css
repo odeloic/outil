@@ -1,20 +1,23 @@
 .file-diff {
-  --diff-line-height: 20px;
+  --diff-line-height: var(--ods-diff-line-height);
   border: 1px solid var(--ods-line);
   border-radius: var(--ods-radius-lg);
   background: var(--ods-surface);
   overflow: clip;
+  scroll-margin-top: var(--ods-topbar-height);
 }
 
 .file-diff__header {
   position: sticky;
-  top: 0;
+  top: var(--ods-topbar-height);
   z-index: 1;
   display: flex;
   align-items: center;
   gap: var(--ods-space-5);
-  padding: var(--ods-space-5) var(--ods-space-8) var(--ods-space-5) var(--ods-space-4);
-  background: var(--ods-surface);
+  box-sizing: border-box;
+  min-height: var(--ods-file-header-height);
+  padding: 0 var(--ods-space-8) 0 var(--ods-space-4);
+  background: var(--ods-sunken);
   border-bottom: 1px solid var(--ods-line);
   margin-bottom: -1px;
 }
@@ -58,7 +61,7 @@
 }
 
 .diff {
-  --diff-num-width: max(3ch, calc(var(--diff-num-digits) * 1ch));
+  --diff-num-width: max(var(--ods-diff-num-min), calc(var(--diff-num-digits) * 1ch + var(--ods-space-8)));
   width: max-content;
   min-width: 100%;
   tab-size: var(--diff-tab-width);
@@ -78,9 +81,9 @@
 
 .diff__num {
   flex: none;
-  box-sizing: content-box;
+  box-sizing: border-box;
   width: var(--diff-num-width);
-  padding: 0 var(--ods-space-5);
+  padding: 0 var(--ods-space-4);
   text-align: right;
   color: var(--ods-fg-3);
   user-select: none;
@@ -88,17 +91,18 @@
 
 .diff__comment-btn {
   flex: none;
-  width: var(--ods-space-10);
-  height: var(--diff-line-height);
-  margin: 0;
+  box-sizing: border-box;
+  width: var(--ods-diff-comment-size);
+  height: var(--ods-diff-comment-size);
+  margin: calc((var(--diff-line-height) - var(--ods-diff-comment-size)) / 2) var(--ods-space-1);
   padding: 0;
   border: 0;
-  background: none;
-  color: var(--ods-fg-3);
+  border-radius: var(--ods-radius-sm);
+  background: var(--ods-ink);
+  color: var(--ods-on-ink);
   cursor: pointer;
   opacity: 0;
-  font: inherit;
-  line-height: var(--diff-line-height);
+  font: var(--ods-weight-semibold) var(--ods-text-xs)/var(--ods-diff-comment-size) var(--ods-font-mono);
   text-align: center;
 }
 
@@ -108,12 +112,8 @@
   opacity: 1;
 }
 
-.diff__comment-btn:hover {
-  color: var(--ods-fg);
-}
-
 .diff__comment-btn:focus-visible {
-  outline: 2px solid var(--ods-agent);
+  outline: 2px solid var(--ods-ink);
   outline-offset: 1px;
 }
 
@@ -124,8 +124,8 @@
 
 .diff__sign {
   flex: none;
-  width: 1ch;
-  padding: 0 var(--ods-space-2) 0 var(--ods-space-5);
+  width: var(--ods-diff-sign);
+  text-align: center;
   user-select: none;
 }
 
@@ -210,6 +210,12 @@
   background: var(--ods-sunken);
   color: var(--ods-fg-2);
   padding: var(--ods-space-1) var(--ods-space-5);
+  border-top: 1px solid var(--ods-line);
+  border-bottom: 1px solid var(--ods-line);
+}
+
+.diff__gap .ods-btn {
+  color: var(--ods-fg-2);
 }
 
 .diff__gap-actions {

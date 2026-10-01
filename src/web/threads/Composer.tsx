@@ -57,11 +57,13 @@ export function Composer({ initialBody = '', onSave, onCancel, autoFocus = true,
       )}
       {error && <Note variant="failure">{error}</Note>}
       <div className="composer__actions">
-        <Button onClick={save} disabled={saving || value.trim() === ''}>
+        <Button variant="primary" onClick={save} disabled={saving || value.trim() === ''}>
           {saving ? 'Saving…' : 'Save draft'}
+          <Kbd>⌘↵</Kbd>
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={saving}>
           Cancel
+          <Kbd>Esc</Kbd>
         </Button>
       </div>
     </div>

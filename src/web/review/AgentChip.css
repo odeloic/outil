@@ -1,0 +1,24 @@
+.agent-chip {
+  box-sizing: border-box;
+  height: var(--ods-control-height);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ods-space-7);
+  padding: 0 var(--ods-space-8) 0 var(--ods-space-5);
+  border: 1px solid var(--ods-line);
+  border-radius: var(--ods-radius-lg);
+  background: var(--ods-bg);
+  color: var(--ods-fg);
+  font: var(--ods-weight-semibold) var(--ods-text-sm) var(--ods-font-ui);
+  cursor: pointer;
+}
+
+.agent-chip:hover,
+.agent-chip[aria-expanded="true"] {
+  background: var(--ods-sunken);
+}
+
+.agent-chip > .ods-icon {
+  font-size: var(--ods-text-md);
+  color: var(--ods-fg-2);
+}

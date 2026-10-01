@@ -68,10 +68,6 @@ function openCommit(sha: string) {
   navigate({ ref: sha })
 }
 
-function openComparison(base: string, head: string) {
-  navigate({ base, head })
-}
-
 function App() {
   const target = parseTarget(useSearch())
   const key = targetKey(target)
@@ -122,7 +118,6 @@ function App() {
       pending={pending}
       selectedCommits={review.commits}
       onSelectCommit={openCommit}
-      onCompare={openComparison}
       header={review.header}
       notice={review.notice}
       reviewTarget={review.reviewTarget}

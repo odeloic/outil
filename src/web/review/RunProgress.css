@@ -3,10 +3,10 @@
   flex-direction: column;
   gap: var(--ods-space-3);
   padding: var(--ods-space-5) var(--ods-space-6);
-  background: var(--ods-agent-bg);
-  border: 1px solid var(--ods-agent-line);
+  background: var(--ods-sunken);
+  border: 1px solid var(--ods-line);
   border-radius: var(--ods-radius-md);
-  color: var(--ods-agent);
+  color: var(--ods-fg);
 }
 
 .run-progress__header {

@@ -1,0 +1,81 @@
+.threads-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-7);
+}
+
+.threads-list__empty {
+  margin: 0;
+  padding: 0 var(--ods-space-5);
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-sm);
+}
+
+.threads-list__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-2);
+}
+
+.threads-list__file {
+  margin: 0;
+  padding: 0 var(--ods-space-5);
+  font: var(--ods-weight-medium) var(--ods-text-xs) var(--ods-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threads-list__file-dir {
+  color: var(--ods-fg-3);
+}
+
+.threads-list__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.threads-list__row {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-1);
+  padding: var(--ods-space-4) var(--ods-space-5);
+}
+
+.threads-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ods-space-5);
+}
+
+.threads-list__range {
+  font: var(--ods-text-xs) var(--ods-font-mono);
+  color: var(--ods-fg-2);
+}
+
+.threads-list__excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-xs);
+}
+
+.threads-list__fold {
+  display: flex;
+  align-items: center;
+  gap: var(--ods-space-3);
+  padding: var(--ods-space-3) var(--ods-space-5);
+  border: 0;
+  background: none;
+  color: var(--ods-fg-2);
+  font: var(--ods-weight-medium) var(--ods-text-xs) var(--ods-font-ui);
+  cursor: pointer;
+}
+
+.threads-list > .ods-seg {
+  align-self: flex-start;
+}

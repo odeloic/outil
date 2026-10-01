@@ -1,19 +1,18 @@
 .review {
-  --review-rail-width: 320px;
   display: grid;
-  grid-template-columns: var(--review-rail-width) minmax(0, 1fr);
+  grid-template-columns: var(--ods-rail-width) minmax(0, 1fr);
   align-items: start;
 }
 
 .review__rail {
   position: sticky;
-  top: 0;
-  height: 100vh;
+  top: var(--ods-topbar-height);
+  height: calc(100vh - var(--ods-topbar-height));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--ods-space-8);
-  padding: var(--ods-space-8);
+  padding: var(--ods-space-8) var(--ods-space-5);
   border-right: 1px solid var(--ods-line);
   box-sizing: border-box;
 }
@@ -22,7 +21,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--ods-space-10);
-  padding: var(--ods-space-10) var(--ods-space-12);
+  padding: var(--ods-space-12) var(--ods-space-14) var(--ods-space-13);
   min-width: 0;
 }
 
@@ -43,94 +42,95 @@
   display: none;
 }
 
-.review__summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ods-space-3);
-  padding: var(--ods-space-6);
-  border: 1px solid var(--ods-line);
-  border-radius: var(--ods-radius-lg);
-  background: var(--ods-surface);
-}
-
-.review__summary-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.review__summary-title {
-  font: var(--ods-weight-semibold) var(--ods-text-sm) var(--ods-font-ui);
-}
-
-.review__summary-text {
-  margin: 0;
-  color: var(--ods-fg-2);
-  font-size: var(--ods-text-xs);
-}
-
 .review__main[aria-busy="true"] {
   opacity: 0.6;
   pointer-events: none;
 }
 
-.review__open-threads {
+.review__send {
+  display: flex;
+  align-items: center;
+  gap: var(--ods-space-5);
+}
+
+.review__chip {
+  position: relative;
+}
+
+.review__picker {
+  position: absolute;
+  top: calc(100% + var(--ods-space-7));
+  right: 0;
+  z-index: 20;
+}
+
+.review__send-popover {
+  position: absolute;
+  top: calc(var(--ods-topbar-height) + var(--ods-space-5));
+  right: var(--ods-space-12);
+  z-index: 20;
+  box-sizing: border-box;
+  width: var(--ods-popover-width-send);
+  max-height: var(--ods-popover-max-height);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--ods-popover);
+  border: 1px solid var(--ods-line);
+  border-radius: var(--ods-radius-xl);
+  box-shadow: var(--ods-shadow-popover);
+}
+
+.review__send-popover-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--ods-space-3);
+  padding: var(--ods-space-9) var(--ods-space-10);
 }
 
-.review__open-threads-nav {
-  display: flex;
-  gap: var(--ods-space-2);
+.review__send-popover-drafts {
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-xs);
 }
 
-.review__send {
+.review__send-popover-notes {
   display: flex;
   flex-direction: column;
-  gap: var(--ods-space-3);
+  gap: var(--ods-space-4);
+  padding: 0 var(--ods-space-10) var(--ods-space-9);
+}
+
+.review__send-action {
+  position: relative;
+}
+
+.review__send-hint {
+  position: absolute;
+  top: calc(100% + var(--ods-space-3));
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: var(--ods-space-3) var(--ods-space-5);
+  background: var(--ods-ink);
+  color: var(--ods-on-ink);
+  border-radius: var(--ods-radius-md);
+  font-size: var(--ods-text-xs);
+  white-space: nowrap;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.review__send-hint:empty {
+  display: none;
+}
+
+.review__send-action:hover .review__send-hint,
+.review__send-action:focus-within .review__send-hint {
+  visibility: visible;
 }
 
 .review__send-reason {
   margin: 0;
   color: var(--ods-fg-3);
   font-size: var(--ods-text-2xs);
-}
-
-.review__run-summary {
-  display: flex;
-  gap: var(--ods-space-4);
-  align-items: flex-start;
-  padding: var(--ods-space-5) var(--ods-space-6);
-  background: var(--ods-agent-bg);
-  border: 1px solid var(--ods-agent-line);
-  border-radius: var(--ods-radius-md);
-  color: var(--ods-agent);
-}
-
-.review__run-summary-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--ods-space-2);
-}
-
-.review__run-summary-header {
-  margin: 0;
-  font: var(--ods-weight-semibold) var(--ods-text-xs) var(--ods-font-ui);
-  color: inherit;
-}
-
-.review__run-summary-time {
-  font-weight: var(--ods-weight-regular);
-  color: var(--ods-fg-3);
-}
-
-.review__run-summary-text {
-  margin: 0;
-  color: inherit;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }

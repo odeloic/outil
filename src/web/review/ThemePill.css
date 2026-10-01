@@ -1,0 +1,26 @@
+.theme-pill {
+  position: fixed;
+  left: var(--ods-space-10);
+  bottom: var(--ods-space-10);
+  z-index: 10;
+  display: flex;
+  padding: var(--ods-space-half);
+  background: var(--ods-bg);
+  border: 1px solid var(--ods-line);
+  border-radius: var(--ods-radius-xl);
+}
+
+.theme-pill__option {
+  padding: var(--ods-space-4) var(--ods-space-7);
+  border: 0;
+  border-radius: var(--ods-radius-ctl);
+  background: none;
+  color: var(--ods-fg-2);
+  font: var(--ods-weight-semibold) var(--ods-text-2xs) var(--ods-font-ui);
+  cursor: pointer;
+}
+
+.theme-pill__option[aria-pressed="true"] {
+  background: var(--ods-ink);
+  color: var(--ods-on-ink);
+}

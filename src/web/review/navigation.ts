@@ -146,8 +146,12 @@ function threadOrder(filePaths: readonly string[]): (a: Thread, b: Thread) => nu
   }
 }
 
+export function orderThreads(filePaths: readonly string[], threads: readonly Thread[]): Thread[] {
+  return threads.slice().sort(threadOrder(filePaths))
+}
+
 export function orderOpenThreads(filePaths: readonly string[], threads: readonly Thread[]): Thread[] {
-  return threads.filter(isOpenThread).slice().sort(threadOrder(filePaths))
+  return orderThreads(filePaths, threads.filter(isOpenThread))
 }
 
 export function adjacentOpenThread(

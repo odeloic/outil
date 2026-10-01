@@ -1,29 +1,33 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AgentId, ChangeSet, Review as ReviewData, ReviewTarget, Run, Thread } from '../../shared/api.ts'
-import { AGENT_NAMES } from '../../shared/agents.ts'
-import { draftCount, openThreadCount, threadStatus } from '../../shared/review.ts'
-import { AgentPanel } from '../agents/AgentPanel.tsx'
+import { draftCount, threadStatus } from '../../shared/review.ts'
+import { AgentLabel } from '../agents/AgentLabel.tsx'
+import { AgentPicker } from '../agents/AgentPicker.tsx'
 import { useAgentChoice } from '../agents/useAgentChoice.ts'
 import { renderFix } from '../agents/fixText.tsx'
-import { useModelLabel } from '../agents/useAgentModels.ts'
 import { ApiRequestError } from '../api.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Avatar, Button, CountBadge, Kbd, Note, Tabs, type NoteVariant } from '../design-system'
-import { relativeTime } from '../format.ts'
+import { Button, CountBadge, Kbd, Note, Tabs, type NoteVariant } from '../design-system'
 import { initials } from '../threads/initials.ts'
-import { MessageBody } from '../threads/MessageBody.tsx'
+import { AgentChip } from './AgentChip.tsx'
 import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
+import { ThreadsList } from './ThreadsList.tsx'
+import { unresolvedCount } from './threadGroups.ts'
 import { adjacentOpenThread, focusThread, jumpToFile, orderOpenThreads, resetNavigation, useCurrentFile } from './navigation.ts'
 import { RunEndNote } from './RunEndNote.tsx'
 import { followNotReadyWatch, type NotReadyWatch } from './sendError.ts'
-import { RunProgress } from './RunProgress.tsx'
+import { RunStack } from './RunStack.tsx'
+import { createSendShortcut } from './sendShortcut.ts'
+import { useDismiss } from './useDismiss.ts'
+import { ThemePill } from './ThemePill.tsx'
+import { TopBar } from './TopBar.tsx'
 import { useReview } from './useReview.ts'
 import { useViewedFiles } from './viewed.ts'
 import './Review.css'
 
-type RailTab = 'files' | 'history'
+type RailTab = 'files' | 'threads' | 'history'
 
 const NO_THREADS: Thread[] = []
 const NO_RUNS: Run[] = []
@@ -67,6 +71,8 @@ function SendPanel({
   cancel: (runId: string) => Promise<ReviewData>
 }) {
   const { agent, agents, model, effort, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
+  const [open, setOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendErrorFix, setSendErrorFix] = useState<string | null>(null)
@@ -88,11 +94,10 @@ function SendPanel({
   }
   const runningRun = runs.find((run) => run.state === 'running') ?? null
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
-  const latestRunModelLabel = useModelLabel(latestRun?.agent ?? null, latestRun?.model ?? null)
   const noReplyCount = threads.filter((thread) => threadStatus(thread, runs) === 'failed').length
 
   const reason = !agent
-    ? 'No agent is ready — see Agents above.'
+    ? 'No agent is ready — open the agent menu.'
     : modelsLoading
       ? 'Loading models…'
       : modelsError
@@ -106,7 +111,9 @@ function SendPanel({
   const canSend = reason === null && agent !== null && model !== null
 
   const handleSend = () => {
-    if (!agent || !model) return
+    if (!agent || !model || sending) return
+    setPickerOpen(false)
+    setOpen(true)
     setSending(true)
     setSendError(null)
     setSendErrorFix(null)
@@ -136,67 +143,153 @@ function SendPanel({
 
   const latestEndNote = latestRun && END_NOTE_STATES.has(latestRun.state) ? endNote(latestRun) : null
   const shownReason = latestEndNote && drafts === 0 ? null : reason
-  const describedBy = runningRun ? 'review-run-progress' : shownReason ? 'review-send-reason' : undefined
+  const sendHint = sending ? null : shownReason
+
+  const chipRef = useRef<HTMLButtonElement>(null)
+  const sendButtonRef = useRef<HTMLButtonElement>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const closePicker = useCallback(() => setPickerOpen(false), [])
+  const closeRuns = useCallback(() => setOpen(false), [])
+  useDismiss(pickerRef, pickerOpen, closePicker, chipRef)
+  useDismiss(popoverRef, open, closeRuns, sendButtonRef)
+  const focusPopover = useCallback((element: HTMLDivElement | null) => element?.focus(), [])
+
+  const sendable = canSend && !sending
+  const shortcut = useMemo(() => createSendShortcut(), [])
+  const onShortcutSend = useEffectEvent(() => {
+    if (sendable) handleSend()
+  })
+  useEffect(() => {
+    const isEditable = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null
+      return element?.tagName === 'INPUT' || element?.tagName === 'TEXTAREA' || element?.isContentEditable === true
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const shouldSend = shortcut.keyDown({
+        key: event.key,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        repeat: event.repeat,
+        defaultPrevented: event.defaultPrevented,
+        fromEditable: isEditable(event.target),
+        at: event.timeStamp,
+      })
+      if (!shouldSend) return
+      event.preventDefault()
+      onShortcutSend()
+    }
+    const onKeyUp = (event: KeyboardEvent) => shortcut.keyUp(event.key)
+    document.addEventListener('keydown', onKeyDown, true)
+    const onBlur = () => shortcut.reset()
+    document.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [shortcut])
 
   return (
-    <div className="review__send">
-      <Button variant="primary" onClick={handleSend} disabled={!canSend || sending} aria-describedby={describedBy}>
-        {sending ? 'Sending…' : sendLabel(drafts)}
-      </Button>
-      {runningRun ? (
-        <RunProgress run={runningRun} onCancel={() => cancel(runningRun.id)} />
-      ) : (
-        shownReason && (
-          <p id="review-send-reason" className="review__send-reason">
-            {shownReason}
-          </p>
-        )
-      )}
-      {drafts > 0 && noReplyCount > 0 && (
-        <p className="review__send-reason">
-          Also re-sends {noReplyCount} {noReplyCount === 1 ? 'thread' : 'threads'} with no reply.
-        </p>
-      )}
-      {sendError && (
-        <Note
-          variant="failure"
-          action={
-            <Button variant="default" onClick={recheckAgents} disabled={agentsLoading}>
-              {agentsLoading ? 'Checking…' : 'Check again'}
-            </Button>
-          }
-        >
-          {sendError}
-          {sendErrorFix && <span> {renderFix(sendErrorFix)}</span>}
-        </Note>
-      )}
-      {latestRun?.state === 'done' && (
-        <div className="review__run-summary">
-          <Avatar kind="agent" />
-          <div className="review__run-summary-body">
-            <p className="review__run-summary-header">
-              {AGENT_NAMES[latestRun.agent]} · {latestRunModelLabel ?? latestRun.model}
-              {latestRun.endedAt && <span className="review__run-summary-time"> · {relativeTime(latestRun.endedAt)}</span>}
-            </p>
-            {latestRun.summary && (
-              <div className="review__run-summary-text">
-                <MessageBody body={latestRun.summary} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {latestEndNote && (
-        <RunEndNote
-          variant={latestEndNote.variant}
-          message={latestEndNote.message}
-          fix={latestEndNote.variant === 'failure' ? latestAgentFix : null}
-          actionLabel={latestEndNote.actionLabel}
-          actionTitle={RETRY_TITLE}
-          onAction={handleSend}
-          pending={sending}
-          disabled={!agent || !model}
+    <div className="review__send" ref={popoverRef}>
+      <div className="review__chip" ref={pickerRef}>
+        <AgentChip
+          ref={chipRef}
+          agent={agent}
+          model={model}
+          effort={effort}
+          open={pickerOpen}
+          onToggle={() => {
+            setOpen(false)
+            setPickerOpen((value) => !value)
+          }}
+          controls="review-agent-picker"
         />
+        {pickerOpen && (
+          <div className="review__picker">
+            <AgentPicker id="review-agent-picker" />
+          </div>
+        )}
+      </div>
+      {runs.length > 0 && (
+        <Button
+          variant="ghost"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-controls="review-send-popover"
+          onClick={() => {
+            setPickerOpen(false)
+            setOpen((value) => !value)
+          }}
+        >
+          Runs
+          <CountBadge count={runs.length} />
+        </Button>
+      )}
+      <div className="review__send-action">
+        <Button
+          ref={sendButtonRef}
+          variant="primary"
+          className="ods-btn--lg"
+          onClick={() => {
+            if (sendable) handleSend()
+          }}
+          aria-disabled={!sendable}
+          aria-describedby="review-send-reason"
+        >
+          {sending ? 'Sending…' : sendLabel(drafts)}
+          <Kbd>⌘↵</Kbd>
+        </Button>
+        <p id="review-send-reason" className="review__send-hint" role="status">
+          {sendHint}
+        </p>
+      </div>
+      {open && (
+        <div id="review-send-popover" ref={focusPopover} tabIndex={-1} className="review__send-popover" role="dialog" aria-label="Agent runs">
+          {agent && (
+            <div className="review__send-popover-header">
+              <AgentLabel agent={agent} model={model} effort={effort} size="md" />
+              <span className="review__send-popover-drafts">{drafts === 1 ? '1 draft' : `${drafts} drafts`}</span>
+            </div>
+          )}
+          {(shownReason || sendError || latestEndNote || (drafts > 0 && noReplyCount > 0)) && (
+            <div className="review__send-popover-notes">
+              {!runningRun && shownReason && <p className="review__send-reason">{shownReason}</p>}
+              {drafts > 0 && noReplyCount > 0 && (
+                <p className="review__send-reason">
+                  Also re-sends {noReplyCount} {noReplyCount === 1 ? 'thread' : 'threads'} with no reply.
+                </p>
+              )}
+              {sendError && (
+                <Note
+                  variant="failure"
+                  action={
+                    <Button variant="default" onClick={recheckAgents} disabled={agentsLoading}>
+                      {agentsLoading ? 'Checking…' : 'Check again'}
+                    </Button>
+                  }
+                >
+                  {sendError}
+                  {sendErrorFix && <span> {renderFix(sendErrorFix)}</span>}
+                </Note>
+              )}
+              {latestEndNote && (
+                <RunEndNote
+                  variant={latestEndNote.variant}
+                  message={latestEndNote.message}
+                  fix={latestEndNote.variant === 'failure' ? latestAgentFix : null}
+                  actionLabel={latestEndNote.actionLabel}
+                  actionTitle={RETRY_TITLE}
+                  onAction={handleSend}
+                  pending={sending}
+                  disabled={!agent || !model}
+                />
+              )}
+            </div>
+          )}
+          <RunStack runs={runs} onCancel={cancel} />
+        </div>
       )}
     </div>
   )
@@ -210,7 +303,6 @@ type Props = {
   pending: boolean
   selectedCommits: string[]
   onSelectCommit: (sha: string) => void
-  onCompare: (base: string, head: string) => void
   reviewTarget: ReviewTarget
 }
 
@@ -222,7 +314,6 @@ export function Review({
   pending,
   selectedCommits,
   onSelectCommit,
-  onCompare,
   reviewTarget,
 }: Props) {
   const [viewed, setViewed] = useViewedFiles(reviewKey)
@@ -248,7 +339,7 @@ export function Review({
   }, [review])
   const drafts = review ? draftCount(review) : 0
   const runs = review?.runs ?? NO_RUNS
-  const openCount = review ? openThreadCount(review) : 0
+  const threadTabCount = review ? unresolvedCount(review.threads) : 0
   const pathIndex = useMemo(() => new Map(changes.files.map((file, index) => [file.path, index])), [changes])
   const filePaths = useMemo(() => changes.files.map((file) => file.path), [changes])
   const openThreads = useMemo(() => (review ? orderOpenThreads(filePaths, review.threads) : []), [review, filePaths])
@@ -262,16 +353,22 @@ export function Review({
     setOverrides(({ key, map }) => ({ key, map: new Map(map).set(path, collapsed) }))
   }, [])
 
-  const goToOpenThread = useCallback(
-    (direction: 1 | -1) => {
-      const thread = adjacentOpenThread(filePaths, openThreads, navThread, direction)
-      if (!thread) return
+  const goToThread = useCallback(
+    (thread: Thread) => {
       setNavState({ key: reviewKey, thread })
       setCollapsed(thread.anchor.path, false)
       const fileIndex = pathIndex.get(thread.anchor.path)
       if (fileIndex !== undefined) focusThread(thread.id, fileIndex)
     },
-    [filePaths, openThreads, navThread, pathIndex, setCollapsed, reviewKey],
+    [pathIndex, setCollapsed, reviewKey],
+  )
+
+  const goToOpenThread = useCallback(
+    (direction: 1 | -1) => {
+      const thread = adjacentOpenThread(filePaths, openThreads, navThread, direction)
+      if (thread) goToThread(thread)
+    },
+    [filePaths, openThreads, navThread, goToThread],
   )
 
   useEffect(() => {
@@ -305,35 +402,16 @@ export function Review({
 
   return (
     <>
-      {header}
+      <TopBar>
+        <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
+      </TopBar>
       <div className="review">
         <aside className="review__rail">
-          <div className="review__summary">
-            <div className="review__summary-header">
-              <span className="review__summary-title">Review</span>
-              <CountBadge count={drafts} />
-            </div>
-            <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
-            <div className="review__open-threads">
-              <span className="review__summary-text">
-                {openCount} open {openCount === 1 ? 'thread' : 'threads'}
-              </span>
-              <span className="review__open-threads-nav">
-                <Button variant="ghost" onClick={() => goToOpenThread(-1)} disabled={openThreads.length === 0} aria-label="Previous open thread">
-                  <Kbd>[</Kbd> Previous
-                </Button>
-                <Button variant="ghost" onClick={() => goToOpenThread(1)} disabled={openThreads.length === 0} aria-label="Next open thread">
-                  Next <Kbd>]</Kbd>
-                </Button>
-              </span>
-            </div>
-            {error && <Note variant="failure">{error}</Note>}
-            <AgentPanel />
-            <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
-          </div>
+          {error && <Note variant="failure">{error}</Note>}
           <Tabs<RailTab>
             tabs={[
               { key: 'files', label: 'Files', count: changes.files.length },
+              { key: 'threads', label: 'Threads', count: threadTabCount, attention: threadTabCount > 0 },
               { key: 'history', label: 'History' },
             ]}
             active={railTab}
@@ -342,8 +420,11 @@ export function Review({
           <div className="review__panel" role="tabpanel" aria-label="Files" hidden={railTab !== 'files'}>
             <FileList changes={changes} current={current} viewed={viewed} threadsByPath={threadsByPath} onSelect={jumpToFile} />
           </div>
+          <div className="review__panel" role="tabpanel" aria-label="Threads" hidden={railTab !== 'threads'}>
+            <ThreadsList filePaths={filePaths} threads={review?.threads ?? NO_THREADS} runs={runs} activeThreadId={navThread?.id ?? null} onJump={goToThread} />
+          </div>
           <div className="review__panel" role="tabpanel" aria-label="History" hidden={railTab !== 'history'}>
-            <HistoryList selected={selectedCommits} onSelect={onSelectCommit} onCompare={onCompare} />
+            <HistoryList selected={selectedCommits} onSelect={onSelectCommit} />
           </div>
         </aside>
         <main className="review__main" aria-busy={pending}>
@@ -358,6 +439,7 @@ export function Review({
               </Button>
             </span>
           </div>
+          {header}
           {notice}
           {changes.files.length === 0 && <Note variant="hint">There are no changes to show.</Note>}
           {changes.files.map((file, index) => {
@@ -386,6 +468,7 @@ export function Review({
           })}
         </main>
       </div>
+      <ThemePill />
     </>
   )
 }

@@ -167,6 +167,28 @@ describe("runAgent — claude", () => {
     ).rejects.toMatchObject({ kind: "timeout", message: expect.stringContaining("and was stopped.") });
   });
 
+  it("passes --effort only when an effort is chosen", async () => {
+    const bin = await scratchDir();
+    const work = await scratchDir();
+    const withEffort = join(work, "with.txt");
+    const without = join(work, "without.txt");
+    const output = JSON.stringify({ type: "result", subtype: "success", is_error: false, structured_output: { summary: "ok", replies: [] } });
+    for (const file of [withEffort, without]) {
+      await fakeCli(bin, "claude", `printf '%s\\n' "$@" > '${file}'\necho '${output}'\nexit 0`);
+      await runAgent({ agent: "claude", model: "opus", effort: file === withEffort ? "xhigh" : null, cwd: work, prompt: "hi", env: fakeEnv(bin) });
+    }
+
+    const argv = await readArgv(withEffort);
+    expect(argv[argv.indexOf("--effort") + 1]).toBe("xhigh");
+    expect(await readArgv(without)).not.toContain("--effort");
+  });
+
+  it("rejects an unsafe effort before spawning anything", async () => {
+    await expect(
+      runAgent({ agent: "claude", model: "opus", effort: "--bad", cwd: "/tmp", prompt: "hi", env: {} }),
+    ).rejects.toMatchObject({ kind: "failed" });
+  });
+
   it("rejects an unsafe model id before spawning anything", async () => {
     await expect(
       runAgent({ agent: "claude", model: "haiku; rm -rf /", cwd: "/tmp", prompt: "hi", env: {} }),
@@ -369,6 +391,21 @@ exit 0`;
 
     const schemaContent = await readFile(capturedSchema, "utf8");
     expect(JSON.parse(schemaContent)).toEqual(ANSWER_SCHEMA);
+  });
+
+  it("sets model_reasoning_effort through -c only when an effort is chosen", async () => {
+    const bin = await scratchDir();
+    const work = await scratchDir();
+    const withEffort = join(work, "with.txt");
+    const without = join(work, "without.txt");
+    const message = JSON.stringify({ type: "item.completed", item: { id: "i", type: "agent_message", text: JSON.stringify({ summary: "ok", replies: [] }) } });
+    for (const file of [withEffort, without]) {
+      await fakeCli(bin, "codex", `printf '%s\\n' "$@" > '${file}'\necho '${message}'\nexit 0`);
+      await runAgent({ agent: "codex", model: "gpt-6.1-sol", effort: file === withEffort ? "max" : null, cwd: work, prompt: "hi", env: fakeEnv(bin) });
+    }
+
+    expect(await readArgv(withEffort)).toContain('model_reasoning_effort="max"');
+    expect((await readArgv(without)).some((arg) => arg.startsWith("model_reasoning_effort"))).toBe(false);
   });
 
   it("turns command_execution and reasoning items into activity lines, and uses the last agent_message as the answer", async () => {

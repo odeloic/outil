@@ -1,8 +1,12 @@
 import type { AgentId, AgentModel, AgentStatus } from '../../shared/api.ts'
 
-export type AgentChoice = { agent: AgentId; model: string }
+export type AgentChoice = { agent: AgentId; model: string; effort: string | null }
 
-export type StoredChoice = { agent: AgentId; models: Partial<Record<AgentId, string>> }
+export type StoredChoice = {
+  agent: AgentId
+  models: Partial<Record<AgentId, string>>
+  efforts: Partial<Record<AgentId, string>>
+}
 
 const STORAGE_KEY = 'outil:agent'
 const AGENT_ORDER: AgentId[] = ['claude', 'codex']
@@ -13,7 +17,7 @@ function isAgentId(value: unknown): value is AgentId {
 
 export function parseStoredChoice(value: unknown): StoredChoice | null {
   if (typeof value !== 'object' || value === null) return null
-  const raw = value as { agent?: unknown; model?: unknown; models?: unknown }
+  const raw = value as { agent?: unknown; model?: unknown; models?: unknown; efforts?: unknown }
   if (!isAgentId(raw.agent)) return null
   const models: Partial<Record<AgentId, string>> = {}
   if (typeof raw.models === 'object' && raw.models !== null) {
@@ -22,7 +26,13 @@ export function parseStoredChoice(value: unknown): StoredChoice | null {
     }
   }
   if (typeof raw.model === 'string' && raw.model !== '' && !models[raw.agent]) models[raw.agent] = raw.model
-  return { agent: raw.agent, models }
+  const efforts: Partial<Record<AgentId, string>> = {}
+  if (typeof raw.efforts === 'object' && raw.efforts !== null) {
+    for (const [agent, effort] of Object.entries(raw.efforts)) {
+      if (isAgentId(agent) && typeof effort === 'string') efforts[agent] = effort
+    }
+  }
+  return { agent: raw.agent, models, efforts }
 }
 
 export function loadAgentChoice(): StoredChoice | null {
@@ -48,11 +58,16 @@ export function resolveAgent(stored: StoredChoice | null, readyAgents: AgentStat
   return AGENT_ORDER.find((id) => readyIds.has(id)) ?? null
 }
 
-function resolveModel(stored: StoredChoice | null, agent: AgentId, models: AgentModel[]): string | null {
+function resolveModel(stored: StoredChoice | null, agent: AgentId, models: AgentModel[]): AgentModel | null {
   if (models.length === 0) return null
   const remembered = stored?.models[agent]
-  if (remembered && models.some((model) => model.id === remembered)) return remembered
-  return models[0].id
+  return models.find((model) => model.id === remembered) ?? models[0]
+}
+
+export function resolveEffort(stored: StoredChoice | null, agent: AgentId, model: AgentModel | null): string | null {
+  if (!model || model.efforts.length === 0) return null
+  const remembered = stored?.efforts[agent]
+  return remembered && model.efforts.includes(remembered) ? remembered : null
 }
 
 export function resolveChoice(
@@ -63,5 +78,5 @@ export function resolveChoice(
   const agent = resolveAgent(stored, readyAgents)
   if (!agent) return null
   const model = resolveModel(stored, agent, modelsByAgent[agent] ?? [])
-  return model ? { agent, model } : null
+  return model ? { agent, model: model.id, effort: resolveEffort(stored, agent, model) } : null
 }

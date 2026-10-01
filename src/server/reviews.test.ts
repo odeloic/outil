@@ -262,6 +262,7 @@ function runningRun(threadIds: string[]): Run {
     id: "r1",
     agent: "claude",
     model: "sonnet",
+    effort: null,
     state: "running",
     threadIds,
     startedAt: "d",

@@ -92,7 +92,7 @@ export function createApp(cwd: string) {
     resolveThread: (target, id, resolved) => store.update(target, (review) => resolveThread(review, id, resolved)),
     detectAgents: (refresh) => agentCache.list(refresh),
     listModels: (agent) => listModels(agent),
-    send: (target, agent, model) => runner.send(target, agent, model),
+    send: (target, agent, model, effort) => runner.send(target, agent, model, effort),
     cancelRun: (target, id) => runner.cancel(target, id),
     markThreadRead: (target, id) => store.update(target, (review) => markThreadRead(review, id)),
     subscribeEvents: subscribe,

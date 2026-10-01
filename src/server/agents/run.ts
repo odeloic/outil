@@ -4,13 +4,14 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { createInterface } from "node:readline";
 import type { AgentId } from "../../shared/api.ts";
-import { MODEL_PATTERN } from "../../shared/agents.ts";
+import { EFFORT_PATTERN, MODEL_PATTERN } from "../../shared/agents.ts";
 import { ANSWER_SCHEMA } from "./answer.ts";
 import { AgentRunError } from "./errors.ts";
 
 export type RunAgentOptions = {
   agent: AgentId;
   model: string;
+  effort?: string | null;
   cwd: string;
   prompt: string;
   env?: NodeJS.ProcessEnv;
@@ -229,6 +230,7 @@ async function runClaude(options: RunAgentOptions): Promise<unknown> {
     JSON.stringify(ANSWER_SCHEMA),
     "--model",
     options.model,
+    ...(options.effort ? ["--effort", options.effort] : []),
     "--tools",
     "Read,Grep,Glob",
     "--permission-mode",
@@ -294,6 +296,7 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
       schemaFile,
       "-m",
       options.model,
+      ...(options.effort ? ["-c", `model_reasoning_effort="${options.effort}"`] : []),
       "-C",
       options.cwd,
       "-",
@@ -358,6 +361,9 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
 export async function runAgent(options: RunAgentOptions): Promise<unknown> {
   if (!MODEL_PATTERN.test(options.model)) {
     throw new AgentRunError("failed", `"${options.model}" is not a valid model id.`);
+  }
+  if (options.effort && !EFFORT_PATTERN.test(options.effort)) {
+    throw new AgentRunError("failed", `"${options.effort}" is not a valid effort.`);
   }
   switch (options.agent) {
     case "claude":

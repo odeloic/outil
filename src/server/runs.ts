@@ -22,7 +22,7 @@ export type RunnerDeps = {
 };
 
 export type Runner = {
-  send(target: ReviewTarget, agent: AgentId, model: string): Promise<Review>;
+  send(target: ReviewTarget, agent: AgentId, model: string, effort?: string | null): Promise<Review>;
   get(target: ReviewTarget): Promise<Review>;
   cancel(target: ReviewTarget, runId: string): Promise<Review>;
   stopAll(): Promise<void>;
@@ -195,6 +195,7 @@ export function createRunner({
           sha: review.head,
           agent: run.agent,
           model: run.model,
+          effort: run.effort,
           prompt,
           threadIds: run.threadIds,
           signal: controller.signal,
@@ -211,15 +212,19 @@ export function createRunner({
   }
 
   return {
-    async send(target, agent, model) {
+    async send(target, agent, model, effort = null) {
       const statuses = await agents();
       const status = statuses.find((candidate) => candidate.id === agent);
       if (status?.state !== "ready") {
         throw new ReviewError(409, `${AGENT_NAMES[agent]} is not ready to run. Check the Agents panel.`, status?.fix ?? null);
       }
       const models = await listModels(agent);
-      if (!models.some((candidate) => candidate.id === model)) {
+      const chosen = models.find((candidate) => candidate.id === model);
+      if (!chosen) {
         throw new ReviewError(409, `${model} is not a model ${AGENT_NAMES[agent]} offers.`);
+      }
+      if (effort !== null && !chosen.efforts.includes(effort)) {
+        throw new ReviewError(409, `${chosen.label} does not offer the ${effort} effort.`);
       }
 
       const runId = crypto.randomUUID();
@@ -250,6 +255,7 @@ export function createRunner({
           id: runId,
           agent,
           model,
+          effort,
           state: "running",
           threadIds,
           startedAt: now,

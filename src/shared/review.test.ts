@@ -36,6 +36,7 @@ function run(overrides: Partial<Run> = {}): Run {
     id: "r1",
     agent: "claude",
     model: "sonnet",
+    effort: null,
     state: "running",
     threadIds: ["t1"],
     startedAt: "2026-01-01T00:00:00Z",

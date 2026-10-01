@@ -63,10 +63,10 @@ function SendPanel({
   threads: Thread[]
   drafts: number
   runs: Run[]
-  send: (agent: AgentId, model: string) => Promise<ReviewData>
+  send: (agent: AgentId, model: string, effort: string | null) => Promise<ReviewData>
   cancel: (runId: string) => Promise<ReviewData>
 }) {
-  const { agent, agents, model, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
+  const { agent, agents, model, effort, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendErrorFix, setSendErrorFix] = useState<string | null>(null)
@@ -111,7 +111,7 @@ function SendPanel({
     setSendError(null)
     setSendErrorFix(null)
     setNotReadyWatch(null)
-    send(agent, model)
+    send(agent, model, effort)
       .catch((err: unknown) => {
         setSendError(err instanceof Error ? err.message : String(err))
         const notReady = err instanceof ApiRequestError && err.status === 409 && err.fix ? err.fix : null

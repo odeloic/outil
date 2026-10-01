@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as R
 import { createPortal } from 'react-dom'
 import type { AgentModel, AgentStatus } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
-import { Avatar, Button, MenuOption, Note, Popover, Spinner, Tag } from '../design-system'
+import { Avatar, Button, MenuOption, Note, Popover, SegmentedControl, Spinner, Tag } from '../design-system'
 import { renderFix } from './fixText.tsx'
 import { useAgentChoice } from './useAgentChoice.ts'
 import './AgentPanel.css'
@@ -68,11 +68,16 @@ export function AgentPanel() {
     recheckAgents,
     agent,
     model,
+    effort,
+    efforts,
+    defaultEffort,
     models,
     modelsLoading,
     modelsError,
     selectAgent,
     selectModel,
+    selectEffort,
+    clearEffort,
   } = useAgentChoice()
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -180,6 +185,7 @@ export function AgentPanel() {
         <span className="agent-panel__choice">
           <span className="agent-panel__choice-name">{AGENT_NAMES[agent]}</span>
           {modelLabel && <span className="agent-panel__model">{modelLabel}</span>}
+          {effort && <span className="agent-panel__effort">{effort}</span>}
         </span>
       </Button>
       {notReady > 0 && <Tag>{notReady} not ready</Tag>}
@@ -187,7 +193,7 @@ export function AgentPanel() {
         pos &&
         createPortal(
           <div className="agent-panel__popover" style={{ top: pos.top, left: pos.left }}>
-            <Popover ariaLabel="Choose the agent and model">
+            <Popover ariaLabel="Choose the agent, model and effort">
               <div
                 ref={focusPopover}
                 tabIndex={-1}
@@ -222,6 +228,29 @@ export function AgentPanel() {
                     </p>
                   )}
                 </div>
+                {efforts.length > 0 && (
+                  <div className="agent-panel__section">
+                    <div className="agent-panel__section-head">
+                      <p className="agent-panel__section-title">
+                        Effort
+                        {defaultEffort && <span className="agent-panel__section-hint"> · default {defaultEffort}</span>}
+                      </p>
+                      {effort && (
+                        <Button variant="ghost" className="agent-panel__use-default" onClick={clearEffort}>
+                          Use default
+                        </Button>
+                      )}
+                    </div>
+                    <div className="agent-panel__effort-control">
+                      <SegmentedControl
+                        ariaLabel="Effort"
+                        value={effort ?? ''}
+                        onChange={selectEffort}
+                        options={efforts.map((level) => ({ value: level, label: level }))}
+                      />
+                    </div>
+                  </div>
+                )}
                 <CheckAgainButton loading={agentsLoading} onClick={recheckAgents} />
               </div>
             </Popover>

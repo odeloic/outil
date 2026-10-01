@@ -135,6 +135,7 @@ describe("createFileStore", () => {
             id: "run-1",
             agent: "claude" as const,
             model: "sonnet",
+            effort: null,
             state: "done" as const,
             threadIds: [threadId],
             startedAt: new Date().toISOString(),
@@ -287,7 +288,7 @@ describe("createFileStore", () => {
     const commonDir = execFileSync("git", ["-C", dir, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
     const reviewsDir = join(dir, commonDir, "outil", "reviews");
     execFileSync("mkdir", ["-p", reviewsDir]);
-    const run = { id: "r1", agent: "claude", model: "haiku", state: "failed", threadIds: [], startedAt: "x", endedAt: "x", summary: null, error: "e", owner: null, errorKind: "surprise" };
+    const run = { id: "r1", agent: "claude", model: "haiku", effort: null, state: "failed", threadIds: [], startedAt: "x", endedAt: "x", summary: null, error: "e", owner: null, errorKind: "surprise" };
     const malformed = { key: sha, target: { kind: "commit", sha }, base: null, head: sha, threads: [], runs: [run] };
     writeFileSync(join(reviewsDir, `${sha}.json`), JSON.stringify(malformed));
 
@@ -296,6 +297,20 @@ describe("createFileStore", () => {
     expect(review.runs).toHaveLength(1);
     expect(review.runs[0]).not.toHaveProperty("errorKind");
     expect(readdirSync(reviewsDir).some((f) => f.includes(".corrupt-"))).toBe(false);
+  });
+
+  it("reads a run saved before efforts existed as having no effort", async () => {
+    const { dir, commit } = makeRepo();
+    const sha = commit("one");
+    const commonDir = execFileSync("git", ["-C", dir, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
+    const reviewsDir = join(dir, commonDir, "outil", "reviews");
+    execFileSync("mkdir", ["-p", reviewsDir]);
+    const run = { id: "r1", agent: "claude", model: "haiku", state: "done", threadIds: [], startedAt: "x", endedAt: "x", summary: null, error: null, owner: null };
+    writeFileSync(join(reviewsDir, `${sha}.json`), JSON.stringify({ key: sha, target: { kind: "commit", sha }, base: null, head: sha, threads: [], runs: [run] }));
+
+    const review = await createFileStore(dir, resolverFor(dir)).get({ kind: "commit", sha });
+
+    expect(review.runs[0].effort).toBeNull();
   });
 
   it("writes atomically and leaves no leftover tmp files", async () => {

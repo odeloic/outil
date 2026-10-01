@@ -8,6 +8,7 @@ export type AskAgentOptions = {
   sha: string;
   agent: AgentId;
   model: string;
+  effort?: string | null;
   prompt: string;
   threadIds: string[];
   env?: NodeJS.ProcessEnv;
@@ -21,6 +22,7 @@ export function askAgent(options: AskAgentOptions): Promise<ParsedAnswer> {
     const raw = await runAgent({
       agent: options.agent,
       model: options.model,
+      effort: options.effort,
       cwd,
       prompt: options.prompt,
       env: options.env,

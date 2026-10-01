@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,6 +27,32 @@ async function fakeDir(): Promise<string> {
 }
 
 describe("askAgent", () => {
+  it("forwards the effort to the agent invocation", async () => {
+    const { dir, git } = makeRepo();
+    writeFileSync(join(dir, "a.txt"), "a");
+    git("add", "a.txt");
+    git("commit", "-q", "-m", "one");
+    const sha = git("rev-parse", "HEAD");
+    const argvFile = join(dir, "..", `argv-${Date.now()}.txt`);
+    dirs.push(argvFile);
+    const bin = await fakeDir();
+    await writeFake(
+      bin,
+      "claude",
+      [
+        "cat > /dev/null &",
+        `printf '%s\\n' "$@" > '${argvFile}'`,
+        "printf '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"structured_output\":{\"summary\":\"ok\",\"replies\":[]}}\\n'",
+        "exit 0",
+      ].join("\n"),
+    );
+
+    await askAgent({ repoRoot: dir, sha, agent: "claude", model: "opus", effort: "max", prompt: "hi", threadIds: [], env: fakeEnv(bin) });
+
+    const argv = readFileSync(argvFile, "utf8").split("\n");
+    expect(argv[argv.indexOf("--effort") + 1]).toBe("max");
+  });
+
   it("runs against a read-only commit snapshot, drops ghost replies, and reports unanswered threads", async () => {
     const { dir, git } = makeRepo();
     writeFileSync(join(dir, "greet.txt"), "committed-content");

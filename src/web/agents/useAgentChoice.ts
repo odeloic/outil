@@ -12,11 +12,16 @@ export type UseAgentChoice = {
   recheckAgents: () => void
   agent: AgentId | null
   model: string | null
+  effort: string | null
+  efforts: string[]
+  defaultEffort: string | null
   models: AgentModel[]
   modelsLoading: boolean
   modelsError: string | null
   selectAgent: (agent: AgentId) => void
   selectModel: (model: string) => void
+  selectEffort: (effort: string) => void
+  clearEffort: () => void
   stored: StoredChoice | null
 }
 
@@ -45,17 +50,34 @@ export function useAgentChoice(): UseAgentChoice {
   const { models, loading: modelsLoading, error: modelsError } = useAgentModels(agent)
   const choice = agent ? resolveChoice(current, ready, { [agent]: models }) : null
 
+  const chosenModel = models.find((candidate) => candidate.id === choice?.model)
+
   const selectAgent = useCallback((id: AgentId) => {
-    setStored({ agent: id, models: stored?.models ?? {} })
+    setStored({ agent: id, models: stored?.models ?? {}, efforts: stored?.efforts ?? {} })
   }, [])
 
   const selectModel = useCallback(
     (id: string) => {
       if (!agent) return
-      setStored({ agent, models: { ...stored?.models, [agent]: id } })
+      setStored({ agent, models: { ...stored?.models, [agent]: id }, efforts: stored?.efforts ?? {} })
     },
     [agent],
   )
+
+  const selectEffort = useCallback(
+    (id: string) => {
+      if (!agent) return
+      setStored({ agent, models: stored?.models ?? {}, efforts: { ...stored?.efforts, [agent]: id } })
+    },
+    [agent],
+  )
+
+  const clearEffort = useCallback(() => {
+    if (!agent || !stored) return
+    const efforts = { ...stored.efforts }
+    delete efforts[agent]
+    setStored({ agent, models: stored.models, efforts })
+  }, [agent])
 
   const recheckAgents = useCallback(() => {
     void recheck().then(reloadAgentModels)
@@ -69,11 +91,16 @@ export function useAgentChoice(): UseAgentChoice {
     recheckAgents,
     agent,
     model: choice?.model ?? null,
+    effort: choice?.effort ?? null,
+    efforts: chosenModel?.efforts ?? [],
+    defaultEffort: chosenModel?.defaultEffort ?? null,
     models,
     modelsLoading,
     modelsError,
     selectAgent,
     selectModel,
+    selectEffort,
+    clearEffort,
     stored: current,
   }
 }

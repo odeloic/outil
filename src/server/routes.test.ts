@@ -723,6 +723,40 @@ describe("POST /api/review/send", () => {
     expect(calls).toEqual([[target, "claude", "haiku"]]);
   });
 
+  it("passes the chosen effort through, defaulting to none", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      send: async (t, agent, model, effort) => {
+        calls.push([agent, model, effort]);
+        return emptyReview(t);
+      },
+    });
+    for (const effort of ["high", undefined, null]) {
+      await app.request("/api/review/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, agent: "claude", model: "opus", effort }),
+      });
+    }
+    expect(calls).toEqual([
+      ["claude", "opus", "high"],
+      ["claude", "opus", null],
+      ["claude", "opus", null],
+    ]);
+  });
+
+  it("rejects a malformed effort", async () => {
+    const app = makeApp({});
+    for (const effort of ["", "--bad", "High", 3, ["low"]]) {
+      const res = await app.request("/api/review/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, agent: "claude", model: "opus", effort }),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
   it("rejects an invalid target, agent, or model", async () => {
     const app = makeApp({});
     const cases = [
@@ -924,7 +958,7 @@ describe("GET /api/agents/:id/models", () => {
     { id: "claude", name: "Claude Code", state: "ready", fix: null },
     { id: "codex", name: "Codex", state: "signed-out", fix: "Run `codex login`." },
   ];
-  const models: AgentModel[] = [{ id: "opus", label: "Opus" }];
+  const models: AgentModel[] = [{ id: "opus", label: "Opus", efforts: [], defaultEffort: null }];
 
   it("rejects an id other than claude or codex", async () => {
     const app = makeApp({});

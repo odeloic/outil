@@ -30,7 +30,7 @@ export function RunProgress({ run, onCancel }: { run: Run; onCancel: () => Promi
       <div className="run-progress__header">
         <Spinner />
         <span className="run-progress__title">
-          {AGENT_NAMES[run.agent]} · {modelLabel ?? run.model} is reviewing {threadCount} {threadCount === 1 ? 'thread' : 'threads'}
+          {AGENT_NAMES[run.agent]} · {modelLabel ?? run.model}{run.effort && ` ${run.effort}`} is reviewing {threadCount} {threadCount === 1 ? 'thread' : 'threads'}
         </span>
         <span className="run-progress__elapsed">{elapsed}</span>
         <Button variant="ghost" onClick={handleCancel} disabled={cancelling} className="run-progress__cancel">

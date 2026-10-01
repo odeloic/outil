@@ -112,6 +112,8 @@ export type AgentStatus = {
 export type AgentModel = {
   id: string
   label: string
+  efforts: string[]
+  defaultEffort: string | null
 }
 
 export type LineSide = "old" | "new"
@@ -165,6 +167,7 @@ export type Run = {
   id: string
   agent: AgentId
   model: string
+  effort: string | null
   state: RunState
   threadIds: string[]
   startedAt: string

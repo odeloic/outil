@@ -28,6 +28,7 @@ function runningRun(overrides: Partial<Review["runs"][number]> = {}) {
     id: "r1",
     agent: "claude" as const,
     model: "haiku",
+    effort: null,
     state: "running" as const,
     threadIds: ["t1"],
     startedAt: "d",

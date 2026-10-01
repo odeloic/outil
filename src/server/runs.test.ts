@@ -9,7 +9,7 @@ import { createRunner, type AskFn, type RunnerDeps } from "./runs.ts";
 const sha = "a".repeat(40);
 const target: ReviewTarget = { kind: "commit", sha };
 const readyAgents: AgentStatus[] = [{ id: "claude", name: "Claude Code", state: "ready", fix: null }];
-const claudeModels = [{ id: "haiku", label: "Haiku" }];
+const claudeModels = [{ id: "haiku", label: "Haiku", efforts: [], defaultEffort: null }];
 
 function draftThread(id: string): Thread {
   return {
@@ -88,6 +88,7 @@ function runOwnedBy(overrides: Partial<Run>): Run {
     id: "stale",
     agent: "claude",
     model: "haiku",
+    effort: null,
     state: "running",
     threadIds: ["t1"],
     startedAt: "d",
@@ -108,7 +109,7 @@ describe("createRunner.send", () => {
 
     expect(review.threads.every((t) => t.messages.every((m) => m.author !== "reviewer" || m.state === "sent"))).toBe(true);
     expect(review.runs).toHaveLength(1);
-    expect(review.runs[0]).toMatchObject({ agent: "claude", model: "haiku", state: "running", threadIds: ["t1", "t2"], endedAt: null });
+    expect(review.runs[0]).toMatchObject({ agent: "claude", model: "haiku", effort: null, state: "running", threadIds: ["t1", "t2"], endedAt: null });
     expect(review.runs[0].owner?.pid).toBe(process.pid);
     expect(typeof review.runs[0].owner?.instance).toBe("string");
     expect(calls).toEqual([sha]);
@@ -136,6 +137,36 @@ describe("createRunner.send", () => {
     await expect(runner.send(target, "claude", "haiku")).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Claude Code") });
     expect(store.current().runs).toEqual([]);
     expect(store.current().threads[0].messages[0]).toMatchObject({ state: "draft" });
+  });
+
+  it("stores the effort on the run and hands it to the agent", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const asked: unknown[] = [];
+    const { runner, waitFor } = makeRunner({
+      store,
+      listModels: async () => [{ id: "opus", label: "Opus", efforts: ["low", "high"], defaultEffort: null }],
+      ask: async (options) => {
+        asked.push(options.effort);
+        return { summary: "ok", replies: [], unanswered: [] };
+      },
+    });
+
+    const review = await runner.send(target, "claude", "opus", "high");
+    await waitFor(2);
+
+    expect(review.runs[0].effort).toBe("high");
+    expect(asked).toEqual(["high"]);
+  });
+
+  it("rejects with 409 and marks nothing sent when the model does not offer the effort", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { runner } = makeRunner({ store });
+
+    await expect(runner.send(target, "claude", "haiku", "high")).rejects.toMatchObject({
+      status: 409,
+      message: "Haiku does not offer the high effort.",
+    });
+    expect(store.current().runs).toEqual([]);
   });
 
   it("rejects with 409 and marks nothing sent when the model is not one the agent offers", async () => {
@@ -244,6 +275,7 @@ describe("createRunner follow-ups", () => {
       id: "r0",
       agent: "claude",
       model: "haiku",
+      effort: null,
       state: "done",
       threadIds: ["t1"],
       startedAt: "d",
@@ -262,7 +294,7 @@ describe("createRunner follow-ups", () => {
       store,
       ask,
       agents: async () => [{ id: "codex", name: "Codex", state: "ready", fix: null }],
-      listModels: async () => [{ id: "gpt-5.6-luna", label: "gpt-5.6-luna" }],
+      listModels: async () => [{ id: "gpt-5.6-luna", label: "gpt-5.6-luna", efforts: [], defaultEffort: null }],
     });
 
     const sent = await runner.send(target, "codex", "gpt-5.6-luna");

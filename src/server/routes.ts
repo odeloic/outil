@@ -20,7 +20,7 @@ import type {
   ResolvedCommit,
   ThreadAnchor,
 } from "../shared/api.ts";
-import { MODEL_PATTERN } from "../shared/agents.ts";
+import { EFFORT_PATTERN, MODEL_PATTERN } from "../shared/agents.ts";
 import type { EventHandlers, Subscription } from "./events.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
@@ -43,7 +43,7 @@ export type RouteDeps = {
   resolveThread: (target: ReviewTarget, id: string, resolved: boolean) => Promise<Review>;
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
-  send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
+  send: (target: ReviewTarget, agent: AgentId, model: string, effort: string | null) => Promise<Review>;
   cancelRun: (target: ReviewTarget, id: string) => Promise<Review>;
   markThreadRead: (target: ReviewTarget, id: string) => Promise<Review>;
   subscribeEvents: (key: string, handlers: EventHandlers) => Subscription;
@@ -168,13 +168,18 @@ function isAgentId(value: string): value is AgentId {
 
 const AGENT_IDS = new Set(["claude", "codex"]);
 
-const sendBody = validator("json", (body, c): { target: ReviewTarget; agent: AgentId; model: string } | Response => {
-  const { target, agent, model } = (body ?? {}) as Record<string, unknown>;
+type SendBody = { target: ReviewTarget; agent: AgentId; model: string; effort: string | null };
+
+const sendBody = validator("json", (body, c): SendBody | Response => {
+  const { target, agent, model, effort } = (body ?? {}) as Record<string, unknown>;
   const trimmedModel = typeof model === "string" ? model.trim() : "";
   if (!isReviewTarget(target) || !AGENT_IDS.has(agent as string) || !MODEL_PATTERN.test(trimmedModel)) {
     return c.json({ error: "A send needs a target, an agent (claude or codex), and a model." } satisfies ApiError, 400);
   }
-  return { target, agent: agent as AgentId, model: trimmedModel };
+  if (effort !== undefined && effort !== null && (typeof effort !== "string" || !EFFORT_PATTERN.test(effort))) {
+    return c.json({ error: "An effort must be a lowercase level name such as low or high." } satisfies ApiError, 400);
+  }
+  return { target, agent: agent as AgentId, model: trimmedModel, effort: effort ?? null };
 });
 
 export const MAX_HISTORY_PAGE = 200;
@@ -385,9 +390,9 @@ export function createRoutes({
       }
     })
     .post("/api/review/send", sendBody, async (c) => {
-      const { target, agent, model } = c.req.valid("json");
+      const { target, agent, model, effort } = c.req.valid("json");
       try {
-        return c.json(await send(target, agent, model), 200);
+        return c.json(await send(target, agent, model, effort), 200);
       } catch (err) {
         return c.json(...reviewFailure(err));
       }

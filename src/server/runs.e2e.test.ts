@@ -100,7 +100,7 @@ describe("createRunner end-to-end with a fake CLI", () => {
       store,
       ask: (options) => askAgent({ repoRoot: dir, ...options, env: fakeEnv(bin) }),
       agents: async () => [{ id: "claude", name: "Claude Code", state: "ready", fix: null }],
-      listModels: async () => [{ id: "haiku", label: "Haiku" }],
+      listModels: async () => [{ id: "haiku", label: "Haiku", efforts: [], defaultEffort: null }],
       context: (r) => promptContext(dir, r, (commitSha) => getCommit(dir, commitSha), noRenames),
       onChange,
     });
@@ -165,7 +165,7 @@ describe("POST /api/review/runs/:id/cancel — a fake CLI that ignores SIGTERM",
       store,
       ask: (options) => askAgent({ repoRoot: dir, ...options, env: fakeEnv(bin) }),
       agents: async () => [{ id: "claude", name: "Claude Code", state: "ready", fix: null }],
-      listModels: async () => [{ id: "haiku", label: "Haiku" }],
+      listModels: async () => [{ id: "haiku", label: "Haiku", efforts: [], defaultEffort: null }],
       context: (r) => promptContext(dir, r, (commitSha) => getCommit(dir, commitSha), noRenames),
       onChange: () => {},
     });

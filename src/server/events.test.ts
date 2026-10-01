@@ -15,7 +15,7 @@ function review(key: string, overrides: Partial<Review> = {}): Review {
 }
 
 function runningRun(id: string): Run {
-  return { id, agent: "claude", model: "haiku", state: "running", threadIds: [], startedAt: "d", endedAt: null, summary: null, error: null, owner: null };
+  return { id, agent: "claude", model: "haiku", effort: null, state: "running", threadIds: [], startedAt: "d", endedAt: null, summary: null, error: null, owner: null };
 }
 
 describe("subscribe / publishReview", () => {

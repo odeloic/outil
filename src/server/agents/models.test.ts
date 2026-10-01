@@ -20,11 +20,11 @@ describe("listModels", () => {
     expect(models.map((m) => m.id)).toEqual(["fable", "opus", "sonnet", "haiku"]);
   });
 
-  it("offers claude's effort levels on every model except haiku, with no default", async () => {
+  it("offers claude's effort levels on every model except haiku, defaulting to high", async () => {
     const models = await listModels("claude");
     for (const model of models.filter((m) => m.id !== "haiku")) {
       expect(model.efforts).toEqual(["low", "medium", "high", "xhigh", "max"]);
-      expect(model.defaultEffort).toBeNull();
+      expect(model.defaultEffort).toBe("high");
     }
     expect(models.find((m) => m.id === "haiku")?.efforts).toEqual([]);
   });
@@ -52,6 +52,23 @@ describe("listModels", () => {
       { id: "gpt-6.1-sol", label: "GPT-6.1-Sol", efforts: ["low", "max"], defaultEffort: null },
       { id: "gpt-6-luna", label: "GPT-6-Luna", efforts: [], defaultEffort: null },
     ]);
+  });
+
+  it("falls back to codex's medium effort when the default level is absent or not offered", async () => {
+    const dir = await fakeDir();
+    const levels = (...efforts: string[]) => efforts.map((effort) => ({ effort }));
+    const payload = {
+      models: [
+        { slug: "absent", display_name: "Absent", visibility: "list", priority: 1, supported_reasoning_levels: levels("low", "medium") },
+        { slug: "not-offered", display_name: "Not Offered", visibility: "list", priority: 2, default_reasoning_level: "ultra", supported_reasoning_levels: levels("low", "medium") },
+        { slug: "no-medium", display_name: "No Medium", visibility: "list", priority: 3, default_reasoning_level: "ultra", supported_reasoning_levels: levels("low", "high") },
+      ],
+    };
+    await writeFake(dir, "codex", `if [ "$1" = "debug" ] && [ "$2" = "models" ]; then cat <<'JSON'\n${JSON.stringify(payload)}\nJSON\nexit 0\nfi\nexit 1\n`);
+
+    const models = await listModels("codex", fakeEnv(dir));
+
+    expect(models.map((model) => model.defaultEffort)).toEqual(["medium", "medium", null]);
   });
 
   it("lists codex's models from `codex debug models`, hiding non-listed ones and ordering by priority", async () => {

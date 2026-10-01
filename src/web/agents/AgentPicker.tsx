@@ -81,10 +81,13 @@ export function AgentPicker({ id }: { id: string }) {
     selectModel,
     selectEffort,
     clearEffort,
+    stored,
   } = useAgentChoice()
 
   const focusBody = useCallback((element: HTMLDivElement | null) => element?.focus(), [])
   const notReady = agents.length - ready.length
+  const storedEffort = agent ? stored?.efforts[agent] : undefined
+  const canUseDefault = storedEffort !== undefined && efforts.includes(storedEffort) && storedEffort !== defaultEffort
 
   let body: React.ReactNode
   if (agentsLoading && agents.length === 0) {
@@ -148,7 +151,7 @@ export function AgentPicker({ id }: { id: string }) {
             title="Effort"
             hint={defaultEffort ? `default ${defaultEffort}` : null}
             action={
-              effort && (
+              canUseDefault && (
                 <Button variant="ghost" className="agent-picker__use-default" onClick={clearEffort}>
                   Use default
                 </Button>

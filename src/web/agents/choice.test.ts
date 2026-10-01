@@ -100,16 +100,16 @@ describe('effort', () => {
     expect(resolveEffort(stored, 'codex', model('gpt-6-luna', levels, 'medium'))).toBe('high')
   })
 
-  it('sends no effort when the remembered one is not offered, even if the model has a default', () => {
+  it('falls back to the model default when the remembered effort is not offered', () => {
     const stored = { agent: 'codex' as const, models: {}, efforts: { codex: 'ultra' } }
-    expect(resolveEffort(stored, 'codex', model('gpt-5.5', levels, 'medium'))).toBeNull()
+    expect(resolveEffort(stored, 'codex', model('gpt-5.5', levels, 'medium'))).toBe('medium')
   })
 
-  it('sends no effort when nothing is stored, even if the model has a default', () => {
-    expect(resolveEffort(null, 'codex', model('gpt-6-luna', levels, 'medium'))).toBeNull()
+  it('uses the model default when nothing is stored', () => {
+    expect(resolveEffort(null, 'codex', model('gpt-6-luna', levels, 'medium'))).toBe('medium')
     const readyAgents = [status('codex')]
     const modelsByAgent = { codex: [model('gpt-6-luna', levels, 'medium')] }
-    expect(resolveChoice(null, readyAgents, modelsByAgent)).toEqual({ agent: 'codex', model: 'gpt-6-luna', effort: null })
+    expect(resolveChoice(null, readyAgents, modelsByAgent)).toEqual({ agent: 'codex', model: 'gpt-6-luna', effort: 'medium' })
   })
 
   it('has no effort when the model offers none or none is remembered', () => {

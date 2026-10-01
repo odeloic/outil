@@ -6,11 +6,13 @@ import { EFFORT_PATTERN } from "../../shared/agents.ts";
 const exec = promisify(execFile);
 
 const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+const CLAUDE_DEFAULT_EFFORT = "high";
+const FALLBACK_EFFORT = "medium";
 
 const CLAUDE_MODELS: AgentModel[] = [
-  { id: "fable", label: "Fable", efforts: CLAUDE_EFFORTS, defaultEffort: null },
-  { id: "opus", label: "Opus", efforts: CLAUDE_EFFORTS, defaultEffort: null },
-  { id: "sonnet", label: "Sonnet", efforts: CLAUDE_EFFORTS, defaultEffort: null },
+  { id: "fable", label: "Fable", efforts: CLAUDE_EFFORTS, defaultEffort: CLAUDE_DEFAULT_EFFORT },
+  { id: "opus", label: "Opus", efforts: CLAUDE_EFFORTS, defaultEffort: CLAUDE_DEFAULT_EFFORT },
+  { id: "sonnet", label: "Sonnet", efforts: CLAUDE_EFFORTS, defaultEffort: CLAUDE_DEFAULT_EFFORT },
   { id: "haiku", label: "Haiku", efforts: [], defaultEffort: null },
 ];
 
@@ -38,7 +40,12 @@ async function codexModels(env: NodeJS.ProcessEnv): Promise<AgentModel[]> {
         id: model.slug,
         label: model.display_name,
         efforts,
-        defaultEffort: defaultLevel !== undefined && efforts.includes(defaultLevel) ? defaultLevel : null,
+        defaultEffort:
+          defaultLevel !== undefined && efforts.includes(defaultLevel)
+            ? defaultLevel
+            : efforts.includes(FALLBACK_EFFORT)
+              ? FALLBACK_EFFORT
+              : null,
       };
     });
 }

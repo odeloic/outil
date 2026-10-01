@@ -89,7 +89,8 @@ or missing value keeps the default.
 ### Known differences with Codex
 
 - Claude's effort levels are a fixed list; Codex's come from `codex debug models`, per model.
-  No effort flag is sent until you pick a level, so the agent's own default applies.
+  Until you pick a level, each model's default effort is used (`high` for Claude; for Codex,
+  the model's own default, else `medium` when offered). Haiku has no effort levels.
 - Codex's model list comes from `codex debug models`, which reads your Codex config; the run
   itself ignores that config (`--ignore-user-config`), so a model from a custom provider in
   your config may be listed but not actually run. The model picker says so under Codex's model

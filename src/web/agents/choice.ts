@@ -67,7 +67,8 @@ function resolveModel(stored: StoredChoice | null, agent: AgentId, models: Agent
 export function resolveEffort(stored: StoredChoice | null, agent: AgentId, model: AgentModel | null): string | null {
   if (!model || model.efforts.length === 0) return null
   const remembered = stored?.efforts[agent]
-  return remembered && model.efforts.includes(remembered) ? remembered : null
+  if (remembered && model.efforts.includes(remembered)) return remembered
+  return model.defaultEffort && model.efforts.includes(model.defaultEffort) ? model.defaultEffort : null
 }
 
 export function resolveChoice(

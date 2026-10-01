@@ -2,9 +2,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--ods-space-7);
-  padding: var(--ods-space-10) var(--ods-space-12);
-  background: var(--ods-surface);
-  border-bottom: 1px solid var(--ods-line);
 }
 
 .commit-header__title {
@@ -14,8 +11,9 @@
 }
 
 .commit-header__subject {
-  font-size: var(--ods-text-xl);
-  font-weight: var(--ods-weight-semibold);
+  font-size: var(--ods-text-2xl);
+  font-weight: var(--ods-weight-bold);
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
@@ -27,29 +25,8 @@
 }
 
 .commit-header__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ods-space-4) var(--ods-space-12);
-  font-size: var(--ods-text-sm);
+  font-size: var(--ods-text-xs);
   color: var(--ods-fg-2);
-}
-
-.commit-header__author {
-  color: var(--ods-fg);
-  font-weight: var(--ods-weight-semibold);
-}
-
-.commit-header__id,
-.commit-header__parents {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ods-space-4);
-}
-
-.commit-header__sha {
-  font: var(--ods-weight-medium) var(--ods-text-xs) var(--ods-font-mono);
-  color: var(--ods-fg);
 }
 
 .commit-header__muted {

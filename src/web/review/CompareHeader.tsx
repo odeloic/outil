@@ -1,26 +1,8 @@
-import type { CommitDetails, Comparison } from '../../shared/api.ts'
-import { Button, Tag } from '../design-system'
-import { relativeTime, shortSha } from '../format.ts'
-import { navigate } from '../router.ts'
+import type { Comparison } from '../../shared/api.ts'
+import { Tag } from '../design-system'
+import { shortSha } from '../format.ts'
+import { RangeSelector } from './RangeSelector.tsx'
 import './CompareHeader.css'
-
-function End({ label, commit }: { label: string; commit: CommitDetails }) {
-  return (
-    <div className="compare-header__end">
-      <span className="compare-header__label">{label}</span>
-      <code className="compare-header__sha" title={commit.sha}>
-        {shortSha(commit.sha)}
-      </code>
-      <span className="compare-header__subject">{commit.subject || 'No commit message'}</span>
-      <span className="compare-header__meta">
-        {commit.author.name} ·{' '}
-        <time dateTime={commit.date} title={new Date(commit.date).toLocaleString()}>
-          {relativeTime(commit.date)}
-        </time>
-      </span>
-    </div>
-  )
-}
 
 export function CompareHeader({ comparison }: { comparison: Comparison }) {
   const { base, head, mergeBase, commitCount } = comparison
@@ -35,17 +17,8 @@ export function CompareHeader({ comparison }: { comparison: Comparison }) {
           {commitCount} {commitCount === 1 ? 'commit' : 'commits'} from <code>{shortSha(base.sha)}</code> to{' '}
           <code>{shortSha(head.sha)}</code>
         </h1>
-        <Button variant="ghost" onClick={() => navigate({ base: head.sha, head: base.sha })}>
-          Swap
-        </Button>
       </div>
-      <div className="compare-header__ends">
-        <End label="Base" commit={base} />
-        <span className="compare-header__arrow" aria-hidden="true">
-          →
-        </span>
-        <End label="Head" commit={head} />
-      </div>
+      <RangeSelector base={base.sha} head={head.sha} />
       {diverged && (
         <p className="compare-header__note">
           These histories have diverged. Changes are shown from their common ancestor,{' '}

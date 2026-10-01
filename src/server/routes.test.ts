@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AgentModel, AgentStatus, Review, ReviewTarget } from "../shared/api.ts";
+import type { ActivityEvent, AgentModel, AgentStatus, Review, ReviewTarget } from "../shared/api.ts";
+import type { EventHandlers } from "./events.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
 import { createRoutes, type RouteDeps } from "./routes.ts";
@@ -24,8 +25,31 @@ function makeApp(overrides: Partial<RouteDeps>) {
     listModels: unstubbed,
     send: unstubbed,
     markThreadRead: unstubbed,
+    subscribeEvents: () => {
+      throw new Error("not stubbed");
+    },
     ...overrides,
   });
+}
+
+async function readEvents(body: ReadableStream<Uint8Array>, count: number): Promise<string[]> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const events: string[] = [];
+  while (events.length < count) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let index: number;
+    while ((index = buffer.indexOf("\n\n")) !== -1) {
+      const chunk = buffer.slice(0, index);
+      buffer = buffer.slice(index + 2);
+      if (chunk.trim() !== "") events.push(chunk);
+    }
+  }
+  await reader.cancel();
+  return events;
 }
 
 describe("GET /api/resolve", () => {
@@ -719,6 +743,97 @@ describe("GET /api/agents/:id/models", () => {
     const ok = await app.request("/api/agents/claude/models");
     expect(ok.status).toBe(200);
     expect(calls).toBe(2);
+  });
+});
+
+describe("GET /api/review/events", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("sends the current review, then replays buffered activity, on connect", async () => {
+    const activity: ActivityEvent = { runId: "r1", text: "Reading a.ts", at: "d" };
+    const subscriptions: EventHandlers[] = [];
+    const app = makeApp({
+      getReview: async (t) => emptyReview(t),
+      subscribeEvents: (key, handlers) => {
+        expect(key).toBe(sha);
+        subscriptions.push(handlers);
+        return { activity: [activity], unsubscribe: () => {} };
+      },
+    });
+
+    const res = await app.request(`/api/review/events?commit=${sha}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const events = await readEvents(res.body!, 2);
+    expect(events[0]).toContain("event: review");
+    expect(events[0]).toContain(JSON.stringify(emptyReview(target)));
+    expect(events[1]).toContain("event: activity");
+    expect(events[1]).toContain(JSON.stringify(activity));
+  });
+
+  it("streams a later review and activity event as they are published", async () => {
+    let handlers: EventHandlers | undefined;
+    const app = makeApp({
+      getReview: async (t) => emptyReview(t),
+      subscribeEvents: (_key, h) => {
+        handlers = h;
+        return { activity: [], unsubscribe: () => {} };
+      },
+    });
+
+    const res = await app.request(`/api/review/events?commit=${sha}`);
+    const reader = res.body!.getReader();
+    await reader.read();
+
+    const updated = { ...emptyReview(target), revision: 1 };
+    handlers!.onReview(updated);
+    const activity: ActivityEvent = { runId: "r1", text: "Thinking", at: "d" };
+    handlers!.onActivity(activity);
+
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!text.includes(JSON.stringify(activity))) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    expect(text).toContain(JSON.stringify(updated));
+    expect(text).toContain(JSON.stringify(activity));
+    await reader.cancel();
+  });
+
+  it("unsubscribes once the client disconnects", async () => {
+    let unsubscribed = false;
+    const app = makeApp({
+      getReview: async (t) => emptyReview(t),
+      subscribeEvents: () => ({ activity: [], unsubscribe: () => (unsubscribed = true) }),
+    });
+
+    const res = await app.request(`/api/review/events?commit=${sha}`);
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(unsubscribed).toBe(true);
+  });
+
+  it("rejects a query that is neither a commit nor a full base/head pair", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/api/review/events");
+    expect(res.status).toBe(400);
+  });
+
+  it("reports a ref error as a 400 instead of opening the stream", async () => {
+    const app = makeApp({
+      getReview: async () => {
+        throw new RefError("unknown", "no such commit");
+      },
+    });
+
+    const res = await app.request(`/api/review/events?commit=${sha}`);
+    expect(res.status).toBe(400);
   });
 });
 

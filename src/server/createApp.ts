@@ -4,6 +4,7 @@ import { detectAgents } from "./agents/detect.ts";
 import { listModels } from "./agents/models.ts";
 import { promptContext } from "./agents/prompt.ts";
 import { getFileDiff } from "./diff.ts";
+import { publishActivity, publishingStore, subscribe } from "./events.ts";
 import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
 import { assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft, markThreadRead } from "./reviews.ts";
@@ -19,13 +20,15 @@ export function stopAllRunners(): Promise<void> {
 export function createApp(cwd: string) {
   const boundListChanges = (base: string | null, head: string) => listChanges(cwd, base, head);
   const boundGetCommit = (sha: string) => getCommit(cwd, sha);
-  const store = createFileStore(
-    cwd,
-    createTargetResolver({
-      assertCommits: (...shas) => assertCommits(cwd, ...shas),
-      getCommit: boundGetCommit,
-      compareCommits: (base, head) => compareCommits(cwd, base, head),
-    }),
+  const store = publishingStore(
+    createFileStore(
+      cwd,
+      createTargetResolver({
+        assertCommits: (...shas) => assertCommits(cwd, ...shas),
+        getCommit: boundGetCommit,
+        compareCommits: (base, head) => compareCommits(cwd, base, head),
+      }),
+    ),
   );
   const agentCache = createAgentCache(() => detectAgents());
   const modelsCache = createModelsCache((agent) => listModels(agent));
@@ -36,7 +39,7 @@ export function createApp(cwd: string) {
     listModels: (agent) => modelsCache.list(agent),
     context: (review) => promptContext(cwd, review, boundGetCommit, boundListChanges),
     onChange: () => {},
-    onActivity: () => {},
+    onActivity: (key, runId, text) => publishActivity(key, { runId, text, at: new Date().toISOString() }),
   });
   runners.add(runner);
 
@@ -60,5 +63,6 @@ export function createApp(cwd: string) {
     listModels: (agent) => listModels(agent),
     send: (target, agent, model) => runner.send(target, agent, model),
     markThreadRead: (target, id) => store.update(target, (review) => markThreadRead(review, id)),
+    subscribeEvents: subscribe,
   });
 }

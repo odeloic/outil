@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AgentId, Review, ReviewTarget, ThreadAnchor } from '../../shared/api.ts'
+import type { ActivityEvent, AgentId, Review, ReviewTarget, ThreadAnchor } from '../../shared/api.ts'
 import { ApiRequestError, client, unwrap } from '../api.ts'
-
-const POLL_MS = 2000
+import { clearRunActivity, recordActivity } from './runActivity.ts'
 
 export function targetKey(target: ReviewTarget): string {
   return target.kind === 'commit' ? target.sha : `${target.base}..${target.head}`
@@ -68,13 +67,42 @@ export function useReview(target: ReviewTarget): UseReview {
     fetchReview(key)
   }, [key, fetchReview])
 
-  const running = state && state.key === key && state.review.runs.some((run) => run.state === 'running')
-
   useEffect(() => {
-    if (!running) return
-    const interval = setInterval(() => void fetchReview(key), POLL_MS)
-    return () => clearInterval(interval)
-  }, [running, key, fetchReview])
+    const dispatchKey = key
+    const current = targetRef.current
+    const query: Record<string, string> =
+      current.kind === 'commit' ? { commit: current.sha } : { base: current.base, head: current.head }
+    const source = new EventSource(`/api/review/events?${new URLSearchParams(query)}`)
+
+    const onReview = (event: MessageEvent<string>) => {
+      let review: Review
+      try {
+        review = JSON.parse(event.data) as Review
+      } catch {
+        return
+      }
+      applyResponse(dispatchKey, review)
+      for (const run of review.runs) {
+        if (run.state !== 'running') clearRunActivity(run.id)
+      }
+    }
+
+    const onActivity = (event: MessageEvent<string>) => {
+      try {
+        recordActivity(JSON.parse(event.data) as ActivityEvent)
+      } catch {
+        return
+      }
+    }
+
+    source.addEventListener('review', onReview)
+    source.addEventListener('activity', onActivity)
+    return () => {
+      source.removeEventListener('review', onReview)
+      source.removeEventListener('activity', onActivity)
+      source.close()
+    }
+  }, [key, applyResponse])
 
   useEffect(() => {
     let cancelled = false

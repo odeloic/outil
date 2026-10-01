@@ -184,3 +184,9 @@ export type Review = {
   revision: number
   generation: string
 }
+
+export type ActivityEvent = {
+  runId: string
+  text: string
+  at: string
+}

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { validator } from "hono/validator";
 import type {
+  ActivityEvent,
   AgentId,
   AgentModel,
   AgentStatus,
@@ -19,8 +21,11 @@ import type {
   ThreadAnchor,
 } from "../shared/api.ts";
 import { MODEL_PATTERN } from "../shared/agents.ts";
+import type { EventHandlers, Subscription } from "./events.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
+
+const HEARTBEAT_MS = 15000;
 
 export type RouteDeps = {
   repoInfo: () => Promise<RepoInfo>;
@@ -38,6 +43,7 @@ export type RouteDeps = {
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
   send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
   markThreadRead: (target: ReviewTarget, id: string) => Promise<Review>;
+  subscribeEvents: (key: string, handlers: EventHandlers) => Subscription;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -207,6 +213,7 @@ export function createRoutes({
   listModels,
   send,
   markThreadRead,
+  subscribeEvents,
 }: RouteDeps) {
   const modelsCache = new Map<AgentId, Promise<AgentModel[]>>();
   return new Hono()
@@ -362,6 +369,41 @@ export function createRoutes({
       } catch (err) {
         return c.json(...reviewFailure(err));
       }
+    })
+    .get("/api/review/events", reviewQuery, async (c) => {
+      const target = reviewTargetFromQuery(c.req.valid("query"));
+      let initial: Review;
+      try {
+        initial = await getReview(target);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
+      }
+      return streamSSE(c, async (stream) => {
+        const key = initial.key;
+        let heartbeat: ReturnType<typeof setInterval> | null = null;
+        let subscription: Subscription | null = null;
+        const aborted = new Promise<void>((resolve) => {
+          stream.onAbort(() => {
+            if (heartbeat) clearInterval(heartbeat);
+            subscription?.unsubscribe();
+            resolve();
+          });
+        });
+        subscription = subscribeEvents(key, {
+          onReview: (review) => {
+            void stream.writeSSE({ event: "review", data: JSON.stringify(review) });
+          },
+          onActivity: (event: ActivityEvent) => {
+            void stream.writeSSE({ event: "activity", data: JSON.stringify(event) });
+          },
+        });
+        await stream.writeSSE({ event: "review", data: JSON.stringify(initial) });
+        for (const event of subscription.activity) {
+          await stream.writeSSE({ event: "activity", data: JSON.stringify(event) });
+        }
+        heartbeat = setInterval(() => void stream.write(": ping\n\n"), HEARTBEAT_MS);
+        await aborted;
+      });
     });
 }
 

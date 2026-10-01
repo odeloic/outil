@@ -13,6 +13,7 @@ import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
 import { jumpToFile, resetNavigation, useCurrentFile } from './navigation.ts'
+import { RunProgress } from './RunProgress.tsx'
 import { useReview } from './useReview.ts'
 import { useViewedFiles } from './viewed.ts'
 import './Review.css'
@@ -71,20 +72,21 @@ function SendPanel({
       .finally(() => setSending(false))
   }
 
+  const describedBy = runningRun ? 'review-run-progress' : reason ? 'review-send-reason' : undefined
+
   return (
     <div className="review__send">
-      <Button
-        variant="primary"
-        onClick={handleSend}
-        disabled={!canSend || sending}
-        aria-describedby={reason ? 'review-send-reason' : undefined}
-      >
+      <Button variant="primary" onClick={handleSend} disabled={!canSend || sending} aria-describedby={describedBy}>
         {sending ? 'Sending…' : sendLabel(drafts)}
       </Button>
-      {reason && (
-        <p id="review-send-reason" className="review__send-reason">
-          {reason}
-        </p>
+      {runningRun ? (
+        <RunProgress run={runningRun} />
+      ) : (
+        reason && (
+          <p id="review-send-reason" className="review__send-reason">
+            {reason}
+          </p>
+        )
       )}
       {drafts > 0 && noReplyCount > 0 && (
         <p className="review__send-reason">

@@ -9,9 +9,9 @@ Every comment thread is in exactly one of five states, and the whole product use
 | State | Meaning | How it reads without color |
 |---|---|---|
 | **Draft** | Written, not sent yet. Editable and deletable. | Dashed border |
-| **Waiting** | Sent, the agent hasn't replied. | Spinner icon |
-| **Answered** | The agent replied. "New reply" until the reviewer opens it. | Diamond icon |
-| **No reply** | The agent failed, timed out, or was cancelled. The comment is kept. | "!" mark, red |
+| **Waiting** | Sent, the agent hasn't replied. | `loading` icon |
+| **Answered** | The agent replied. "New reply" until the reviewer opens it. | `comment-discussion` icon |
+| **No reply** | The agent failed, timed out, or was cancelled. The comment is kept. | `warning` icon, red |
 | **Resolved** | The reviewer closed the thread. Folds to one row. | Checkmark, grey |
 
 See `StatusChip` in `src/web/design-system/components/status/StatusChip.tsx`.
@@ -20,8 +20,8 @@ See `StatusChip` in `src/web/design-system/components/status/StatusChip.tsx`.
 
 Two rules make the distinction survive without color:
 
-- **Shape.** The reviewer's avatar is a dark square with initials (`Avatar kind="reviewer"`). The agent's is a violet diamond with no initials (`Avatar kind="agent"`). Diamonds recur as the "answered" chip's icon and inside `MenuOption` for agent-picker rows.
-- **Tint.** An agent's message, or its summary, sits on `--ods-agent-bg` with `--ods-agent-line` and `--ods-agent`-colored text. A reviewer's message is plain.
+- **Shape.** The reviewer's avatar is a dark square with initials (`Avatar kind="reviewer"`). The agent's is its logo tile with no initials (`Avatar kind="agent"`).
+- **Tint.** An agent's message, or its summary, sits on `--ods-sunken` with `--ods-line` and `--ods-fg` text. A reviewer's message is plain.
 
 ## Additions and removals
 

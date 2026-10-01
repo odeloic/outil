@@ -9,6 +9,7 @@ export interface SegmentedControlProps<Value extends string = string> {
   value: Value
   onChange: (value: Value) => void
   ariaLabel?: string
+  compact?: boolean
 }
 
 export function SegmentedControl<Value extends string = string>({
@@ -16,9 +17,10 @@ export function SegmentedControl<Value extends string = string>({
   value,
   onChange,
   ariaLabel,
+  compact = false,
 }: SegmentedControlProps<Value>) {
   return (
-    <span className="ods-seg" role="group" aria-label={ariaLabel}>
+    <span className={`ods-seg${compact ? ' ods-seg--compact' : ''}`} role="group" aria-label={ariaLabel}>
       {options.map((option) => (
         <button
           key={option.value}

@@ -1,5 +1,6 @@
 :root {
   --ods-space-1: 2px;
+  --ods-space-half: 3px;
   --ods-space-2: 4px;
   --ods-space-3: 5px;
   --ods-space-4: 6px;
@@ -11,9 +12,39 @@
   --ods-space-10: 16px;
   --ods-space-11: 18px;
   --ods-space-12: 20px;
+  --ods-space-13: 28px;
+  --ods-space-14: 40px;
+
+  --ods-topbar-height: 56px;
+  --ods-control-height: 36px;
+  --ods-control-height-sm: 32px;
+  --ods-popover-width-send: 400px;
+  --ods-popover-width-picker: 340px;
+  --ods-popover-width-view: 260px;
+  --ods-rail-width: 300px;
+  --ods-row-height: 32px;
+  --ods-row-height-lg: 36px;
+  --ods-diff-line-height: 22px;
+  --ods-diff-comment-size: 16px;
+  --ods-diff-num-min: 32px;
+  --ods-diff-sign: 20px;
+  --ods-file-header-height: 40px;
+  --ods-lane-status: 14px;
+  --ods-lane-viewed: 14px;
+  --ods-lane-count: 20px;
+  --ods-lane-diffstat: 52px;
+  --ods-logo-size-md: 24px;
+  --ods-logo-size: 22px;
+  --ods-logo-size-xs: 18px;
+  --ods-logo-mark: 14px;
+  --ods-logo-mark-xs: 11px;
+  --ods-popover-max-height: 70vh;
+  --ods-summary-max-height: 4.5em;
 
   --ods-radius-sm: 4px;
   --ods-radius-md: 6px;
+  --ods-radius-ctl: 7px;
+  --ods-radius-opt: 5px;
   --ods-radius-lg: 8px;
   --ods-radius-xl: 10px;
   --ods-radius-pill: 999px;

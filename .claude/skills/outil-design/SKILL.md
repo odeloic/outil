@@ -1,6 +1,6 @@
 ---
 name: outil-design
-description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 19 approved primitives (Button, StatusChip, Avatar, etc.). Not for implementing Outil's actual product screens (review, threads, composer) — those aren't designed yet.
+description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 20 approved primitives (Button, StatusChip, Avatar, etc.). Not for implementing Outil's actual product screens (review, threads, composer) — those aren't designed yet.
 ---
 
 # Outil design system
@@ -36,23 +36,23 @@ Use only `ods-*` classes and the CSS custom properties from `tokens/*.css` — n
 One vocabulary, five states, reused everywhere a thread's state shows up:
 
 - **Draft** — dashed amber border, editable until sent.
-- **Waiting** — blue, spinner icon.
-- **Answered** — violet, diamond icon. "New reply" until the reviewer opens it.
-- **No reply** — red, "!" mark. Agent failed, timed out, or was cancelled; the comment is kept.
-- **Resolved** — grey, checkmark, folded to one row.
+- **Waiting** — blue, `loading` codicon.
+- **Answered** — `comment-discussion` codicon with an unread dot. "New reply" until the reviewer opens it.
+- **No reply** — red, `warning` codicon. Agent failed, timed out, or was cancelled; the comment is kept.
+- **Resolved** — grey, checkmark, folded into a "Resolved N" row with a `chevron-right`.
 
 Never invent a sixth state or restyle these five. Never rely on color alone — each one also has a distinct icon, border style, or mark.
 
 ## Human vs agent (memorize this)
 
-Reviewer: dark square avatar with initials, plain message background. Agent: violet diamond avatar (no initials), message tinted `--ods-agent-bg` with `--ods-agent`-colored text. Shape and tint both change together — never one without the other.
+Reviewer: dark square avatar with initials, plain message background. Agent: its logo tile (Claude clay `#D97757` with a white mark, Codex ink; light tile in dark mode), message tinted `--ods-sunken`. Logo and tint change together — never one without the other. The palette is neutral ink; there is no accent color.
 
 ## Quick token reference
 
-- Surfaces: `--ods-bg`, `--ods-surface`, `--ods-sunken`
+- Surfaces: `--ods-bg`, `--ods-surface`, `--ods-popover`, `--ods-sunken`
 - Borders: `--ods-line`, `--ods-line-2`
 - Text: `--ods-fg`, `--ods-fg-2`, `--ods-fg-3`
-- Agent accent: `--ods-agent`, `--ods-agent-bg`, `--ods-agent-line`, `--ods-on-agent`
+- Ink: `--ods-ink`, `--ods-on-ink` (primary button, focus ring, checked states); `--ods-popover` for popovers
 - Diff: `--ods-add-bg` / `--ods-add-line` / `--ods-add-fg`, `--ods-del-bg` / `--ods-del-line` / `--ods-del-fg`
 - Status: `--ods-draft` / `--ods-draft-bg` / `--ods-draft-line`, `--ods-wait` / `--ods-wait-bg`, `--ods-fail` / `--ods-fail-bg`
 - Fonts: `--ods-font-ui` (Schibsted Grotesk, everything except code), `--ods-font-mono` (JetBrains Mono, code/paths/SHAs/shortcuts)
@@ -60,6 +60,10 @@ Reviewer: dark square avatar with initials, plain message background. Agent: vio
 - Spacing: `--ods-space-1` (2px) to `--ods-space-12` (20px)
 - Radius: `--ods-radius-sm` (4px), `md` (6px), `lg` (8px), `xl` (10px), `pill` (999px)
 
-## The 19 primitives
+## Icons
 
-`Button`, `SegmentedControl`, `Tabs`, `FilterPill` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar` (people) · `Popover`, `MenuOption` (overlay)
+Codicons (`@vscode/codicons`, CC-BY-4.0) through the `Icon` primitive: chevron-down/right, arrow-swap, arrow-up/down, layout, check, add, warning, loading, comment-discussion. There are no sun/moon icons; the theme control is a text pill System / Light / Dark.
+
+## The 20 primitives
+
+`Button`, `SegmentedControl`, `Tabs`, `FilterPill` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar` (people) · `Popover`, `MenuOption` (overlay) · `Icon` (media)

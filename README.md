@@ -126,3 +126,7 @@ symlink alongside the skills so fresh checkouts share the same setup.
 This is repository-local discovery. Agents with different discovery paths need
 their own link or configuration, and distributing skills as an installable plugin
 requires a separate package manifest.
+
+## Attribution
+
+Icons are [Codicons](https://github.com/microsoft/vscode-codicons) by Microsoft, licensed under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/).

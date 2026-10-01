@@ -11,6 +11,10 @@
   --ods-text-2xl: 22px;
   --ods-text-3xl: 34px;
 
+  --ods-line-tight: 1.2;
+  --ods-line-body: 20px;
+  --ods-line-body-sm: 18px;
+
   --ods-weight-regular: 400;
   --ods-weight-medium: 500;
   --ods-weight-semibold: 600;

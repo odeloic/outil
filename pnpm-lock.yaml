@@ -42,6 +42,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.3.1(@types/node@24.19.0))
+      '@vscode/codicons':
+        specifier: ^0.0.46-24
+        version: 0.0.46-24
       eslint:
         specifier: ^10.10.0
         version: 10.11.0
@@ -491,6 +494,9 @@ packages:
 
   '@vitest/spy@5.0.2':
     resolution: {integrity: sha512-Ijc7T1nT9efNb5LxvjaBrEqw3f/QwUv5EE0nKqZxgqsaV/FxAAZ8baGylA8X/Z2oS4Lp+K74Jr6dTJsDKxJDeg==}
+
+  '@vscode/codicons@0.0.46-24':
+    resolution: {integrity: sha512-KIDWUYxG6eh+DHRg+3G4bS487T+g1ZkLfB4HylOBbCcHsvLdfLMRM/m92DS1Ljhi8nglLr9ucwwWhHTEAC+DpA==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1528,6 +1534,8 @@ snapshots:
       vite: 8.3.1(@types/node@24.19.0)
 
   '@vitest/spy@5.0.2': {}
+
+  '@vscode/codicons@0.0.46-24': {}
 
   acorn-jsx@5.3.2(acorn@8.18.0):
     dependencies:

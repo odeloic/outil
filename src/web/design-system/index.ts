@@ -37,7 +37,13 @@ export type { KbdProps } from './components/inputs/Kbd.tsx'
 export { Avatar } from './components/people/Avatar.tsx'
 export type { AvatarProps } from './components/people/Avatar.tsx'
 
+export { AgentLogo } from './components/people/AgentLogo.tsx'
+export type { AgentLogoProps, AgentLogoAgent } from './components/people/AgentLogo.tsx'
+
 export { Popover } from './components/overlay/Popover.tsx'
 export type { PopoverProps } from './components/overlay/Popover.tsx'
 export { MenuOption } from './components/overlay/MenuOption.tsx'
 export type { MenuOptionProps } from './components/overlay/MenuOption.tsx'
+
+export { Icon } from './components/media/Icon.tsx'
+export type { IconProps, IconName } from './components/media/Icon.tsx'

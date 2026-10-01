@@ -2,6 +2,7 @@ export interface TabItem<Key extends string = string> {
   key: Key
   label: string
   count?: number | string
+  attention?: boolean
 }
 
 export interface TabsProps<Key extends string = string> {
@@ -23,7 +24,9 @@ export function Tabs<Key extends string = string>({ tabs, active, onChange }: Ta
           onClick={() => onChange(tab.key)}
         >
           {tab.label}
-          {tab.count !== undefined && <span className="ods-tabs__count">{tab.count}</span>}
+          {tab.count !== undefined && (
+            <span className={`ods-tabs__count${tab.attention ? ' ods-tabs__count--attention' : ''}`}>{tab.count}</span>
+          )}
         </button>
       ))}
     </div>

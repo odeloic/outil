@@ -4,12 +4,11 @@ export interface MenuOptionProps {
   checked?: boolean
   disabled?: boolean
   onSelect?: () => void
-  icon?: ReactNode
   trailing?: ReactNode
   children: ReactNode
 }
 
-export function MenuOption({ checked, disabled, onSelect, icon, trailing, children }: MenuOptionProps) {
+export function MenuOption({ checked, disabled, onSelect, trailing, children }: MenuOptionProps) {
   return (
     <button
       type="button"
@@ -19,7 +18,6 @@ export function MenuOption({ checked, disabled, onSelect, icon, trailing, childr
       disabled={disabled}
       onClick={onSelect}
     >
-      {icon}
       <span>{children}</span>
       {trailing && <span className="ods-menu-option__trailing">{trailing}</span>}
     </button>

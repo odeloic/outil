@@ -1,11 +1,11 @@
 ---
 name: outil-design
-description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 21 approved primitives (Button, StatusChip, Avatar, etc.). Not for implementing Outil's actual product screens (review, threads, composer) — those aren't designed yet.
+description: Use when designing or reviewing UI for Outil, the local code-review tool — building a new screen or component, checking a mockup against the approved design, or looking up a color, spacing, radius or type token. Covers the status vocabulary (draft/waiting/answered/no reply/resolved), the human-vs-agent visual rule, and the 19 approved primitives (Button, StatusChip, Avatar, etc.). Product screens (review, threads, diff, composer) are built on these primitives.
 ---
 
 # Outil design system
 
-Outil is a local code review tool: a developer comments on diff lines of a commit, sends drafts to a coding agent, and the agent replies in the same threads. This skill is the design system for it — tokens and primitives, approved and ready to build with. No product screens exist yet; don't invent one.
+Outil is a local code review tool: a developer comments on diff lines of a commit, sends drafts to a coding agent, and the agent replies in the same threads. This skill is the design system for it — tokens and primitives, approved and ready to build with. The product screens (review, threads, diff, composer) are built on these primitives; don't invent a one-off style for them.
 
 ## Where things live
 
@@ -13,7 +13,7 @@ All of it is in this repo, under `src/web/design-system/`:
 
 - `tokens/color.css`, `tokens/type.css`, `tokens/spacing.css` — the CSS custom properties, light and dark.
 - `styles.css` — imports all tokens plus `components/components.css`. Link this one file to get everything.
-- `components/<group>/<Name>.tsx` — each primitive's implementation and props. Groups: `actions`, `status`, `feedback`, `inputs`, `people`, `overlay`.
+- `components/<group>/<Name>.tsx` — each primitive's implementation and props. Groups: `actions`, `status`, `feedback`, `inputs`, `people`, `overlay`, `media`.
 - `index.ts` — barrel export of every component and its prop types.
 - `references/design-guide.md` — the full design guide: why each token and component decision was made, and which primitive fits which situation. Read it for any non-trivial question.
 
@@ -64,6 +64,6 @@ Reviewer: dark square avatar with initials, plain message background. Agent: the
 
 Codicons (`@vscode/codicons`, CC-BY-4.0) through the `Icon` primitive: chevron-down/right, arrow-swap, arrow-up/down, layout, check, add, warning, loading, comment-discussion, agent. There are no sun/moon icons; the theme control is a text pill System / Light / Dark.
 
-## The 21 primitives
+## The 19 primitives
 
-`Button`, `SegmentedControl`, `Tabs`, `FilterPill` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar`, `AgentLogo` (people) · `Popover`, `MenuOption` (overlay) · `Icon` (media)
+`Button`, `SegmentedControl`, `Tabs` (actions) · `StatusChip`, `Tag`, `FileStatusBadge`, `CountBadge`, `DiffStat` (status) · `Spinner`, `ProgressBar`, `Note` (feedback) · `TextInput`, `TextArea`, `Checkbox`, `Kbd` (inputs) · `Avatar`, `AgentLogo` (people) · `MenuOption` (overlay) · `Icon` (media)

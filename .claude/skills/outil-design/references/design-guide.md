@@ -42,9 +42,8 @@ A twelve-step spacing scale (`--ods-space-1` at 2px through `--ods-space-12` at 
 ## When to use which component
 
 - **Button** — primary for the one commit-worthy action per view (e.g. sending drafts), default for ordinary actions, ghost for low-emphasis actions inside toolbars and popovers.
-- **SegmentedControl** — a small, exclusive 2–3 option toggle for a whole view (layout, appearance). Not for more options — use FilterPill or Tabs.
+- **SegmentedControl** — a small, exclusive 2–3 option toggle for a whole view (layout, appearance). Not for more options — use Tabs.
 - **Tabs** — switching between a small number of full-panel views (e.g. Files / Threads / History), each with an optional count.
-- **FilterPill** — a toggleable filter chip, usually rendered in a row of several.
 - **StatusChip** — the five-state thread vocabulary above, always the same chip wherever a thread's state shows.
 - **Tag** — a small neutral fact label (e.g. "Merge"), not interactive.
 - **FileStatusBadge** — a file's change kind: A / M / D / R, with D shown struck through.
@@ -57,9 +56,8 @@ A twelve-step spacing scale (`--ods-space-1` at 2px through `--ods-space-12` at 
 - **Checkbox** — a labeled checkbox (e.g. marking a file viewed).
 - **Kbd** — a keyboard shortcut key cap, for hints or a shortcut reference table.
 - **Avatar** — see "Human vs agent" above.
-- **Popover** — the surface for a dropdown or floating panel; positioning is the caller's job.
-- **MenuOption** — one selectable row inside a Popover (e.g. one agent in the agent picker).
+- **MenuOption** — one selectable row in a menu (e.g. a branch or commit in the Base/Head range menu).
 
 ## Out of scope, on purpose
 
-No threads, composer, diff view, file rail, header or history component — those need product functionality (state, data, wiring) that doesn't exist yet. This design system is tokens and primitives only; screens come later, once behavior is ready to be built against them.
+Threads, composer, diff view, file rail, header and history are product components built from these primitives in `src/web`, not primitives themselves.

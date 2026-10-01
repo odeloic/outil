@@ -385,21 +385,6 @@
   color: var(--ods-on-ink);
 }
 
-.ods-filter-pill {
-  border: 1px solid var(--ods-line-2);
-  background: none;
-  border-radius: var(--ods-radius-pill);
-  padding: 1px var(--ods-space-6);
-  font-size: var(--ods-text-xs);
-  cursor: pointer;
-  color: var(--ods-fg-2);
-}
-.ods-filter-pill[aria-pressed="true"] {
-  background: var(--ods-fg);
-  color: var(--ods-surface);
-  border-color: var(--ods-fg);
-}
-
 .ods-note {
   border: 1px solid var(--ods-line-2);
   border-radius: var(--ods-radius-lg);
@@ -426,22 +411,6 @@
 .ods-note--hint {
   border-style: dashed;
   color: var(--ods-fg-2);
-}
-
-.ods-popover {
-  background: var(--ods-surface);
-  border: 1px solid var(--ods-line-2);
-  border-radius: var(--ods-radius-xl);
-  box-shadow: var(--ods-shadow-popover);
-  padding: var(--ods-space-8);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ods-space-7);
-  width: 360px;
-}
-.ods-popover--static {
-  box-shadow: none;
-  width: auto;
 }
 
 .ods-menu-option {

@@ -4,8 +4,6 @@ export { SegmentedControl } from './components/actions/SegmentedControl.tsx'
 export type { SegmentedControlProps, SegmentedOption } from './components/actions/SegmentedControl.tsx'
 export { Tabs } from './components/actions/Tabs.tsx'
 export type { TabsProps, TabItem } from './components/actions/Tabs.tsx'
-export { FilterPill } from './components/actions/FilterPill.tsx'
-export type { FilterPillProps } from './components/actions/FilterPill.tsx'
 
 export { StatusChip } from './components/status/StatusChip.tsx'
 export type { StatusChipProps, ThreadStatus } from './components/status/StatusChip.tsx'
@@ -40,8 +38,6 @@ export type { AvatarProps } from './components/people/Avatar.tsx'
 export { AgentLogo } from './components/people/AgentLogo.tsx'
 export type { AgentLogoProps } from './components/people/AgentLogo.tsx'
 
-export { Popover } from './components/overlay/Popover.tsx'
-export type { PopoverProps } from './components/overlay/Popover.tsx'
 export { MenuOption } from './components/overlay/MenuOption.tsx'
 export type { MenuOptionProps } from './components/overlay/MenuOption.tsx'
 

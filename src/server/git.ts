@@ -8,6 +8,8 @@ import type {
   FileChangeStatus,
   HistoryPage,
   HistoryQuery,
+  RefEntry,
+  RefList,
   RepoInfo,
 } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
@@ -186,4 +188,35 @@ export async function compareCommits(cwd: string, base: string, head: string): P
     git(cwd, "rev-list", "--count", `${base}..${head}`),
   ]);
   return { base: baseDetails, head: headDetails, mergeBase: mergeBase || null, commitCount: Number(count) };
+}
+
+const MAX_REFS = 100;
+
+async function listRefEntries(cwd: string, namespace: string, sort: string): Promise<{ entries: RefEntry[]; truncated: boolean }> {
+  const fields = ["%(refname:short)", "%(objectname)", "%(*objectname)", "%(objecttype)", "%(*objecttype)"];
+  const out = await tryGit(cwd, "for-each-ref", `--sort=${sort}`, `--count=${MAX_REFS + 1}`, `--format=${fields.join("%00")}`, namespace);
+  if (!out) return { entries: [], truncated: false };
+  const lines = out.split("\n");
+  const entries: RefEntry[] = [];
+  for (const line of lines.slice(0, MAX_REFS)) {
+    const [name, direct, peeled, type, peeledType] = line.split("\0");
+    const sha = type === "tag" ? peeled : direct;
+    const target = type === "tag" ? peeledType : type;
+    if (name && sha && target === "commit") entries.push({ name, sha });
+  }
+  return { entries, truncated: lines.length > MAX_REFS };
+}
+
+export async function listRefs(cwd: string): Promise<RefList> {
+  const [current, branches, tags] = await Promise.all([
+    tryGit(cwd, "symbolic-ref", "--short", "--quiet", "HEAD"),
+    listRefEntries(cwd, "refs/heads", "-committerdate"),
+    listRefEntries(cwd, "refs/tags", "-creatordate"),
+  ]);
+  return {
+    current: current || null,
+    branches: branches.entries,
+    tags: tags.entries,
+    truncated: branches.truncated || tags.truncated,
+  };
 }

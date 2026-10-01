@@ -175,6 +175,7 @@ describe("POST /api/review/runs/:id/cancel — a fake CLI that ignores SIGTERM",
     };
     const app = createRoutes({
       repoInfo: unstubbed,
+      listRefs: unstubbed,
       resolveCommit: unstubbed,
       getCommit: unstubbed,
       listChanges: unstubbed,

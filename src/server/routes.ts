@@ -16,6 +16,7 @@ import type {
   HistoryQuery,
   Review,
   ReviewTarget,
+  RefList,
   RepoInfo,
   ResolvedCommit,
   ThreadAnchor,
@@ -29,6 +30,7 @@ const HEARTBEAT_MS = 15000;
 
 export type RouteDeps = {
   repoInfo: () => Promise<RepoInfo>;
+  listRefs: () => Promise<RefList>;
   resolveCommit: (ref: string) => Promise<string>;
   getCommit: (sha: string) => Promise<CommitDetails>;
   listChanges: (base: string | null, head: string) => Promise<ChangeSet>;
@@ -215,6 +217,7 @@ function refFailure(err: unknown) {
 
 export function createRoutes({
   repoInfo,
+  listRefs,
   resolveCommit,
   getCommit,
   listChanges,
@@ -239,6 +242,13 @@ export function createRoutes({
     .get("/api/repo", async (c) => {
       try {
         return c.json(await repoInfo(), 200);
+      } catch (err) {
+        return c.json(toApiError(err), 500);
+      }
+    })
+    .get("/api/refs", async (c) => {
+      try {
+        return c.json(await listRefs(), 200);
       } catch (err) {
         return c.json(toApiError(err), 500);
       }

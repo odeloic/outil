@@ -11,6 +11,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
   };
   return createRoutes({
     repoInfo: async () => ({ root: "/repo", head: null, reviewer: null }),
+    listRefs: unstubbed,
     resolveCommit: unstubbed,
     getCommit: unstubbed,
     listChanges: unstubbed,
@@ -228,6 +229,31 @@ describe("GET /api/file-diff", () => {
       const res = await app.request(`/api/file-diff?${query}`);
       expect(res.status).toBe(400);
     }
+  });
+});
+
+describe("GET /api/refs", () => {
+  it("returns the branches and tags the git layer lists", async () => {
+    const refs = { current: "main", branches: [{ name: "main", sha: "a1" }], tags: [{ name: "v1", sha: "b2" }], truncated: false };
+    const app = makeApp({ listRefs: async () => refs });
+
+    const response = await app.request("/api/refs");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(refs);
+  });
+
+  it("reports a failure as a 500", async () => {
+    const app = makeApp({
+      listRefs: async () => {
+        throw new Error("git exploded");
+      },
+    });
+
+    const response = await app.request("/api/refs");
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "git exploded" });
   });
 });
 

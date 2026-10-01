@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { RefError } from "./errors.ts";
-import { compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
+import { compareCommits, getCommit, getRepoInfo, listChanges, listCommits, listRefs, resolveCommit } from "./git.ts";
 
 const dirs: string[] = [];
 
@@ -401,5 +401,59 @@ describe("compareCommits", () => {
     const comparison = await compareCommits(dir, first, other);
     expect(comparison.mergeBase).toBeNull();
     expect(comparison.commitCount).toBe(1);
+  });
+});
+
+describe("listRefs", () => {
+  it("lists local branches and tags with the commits they point at, and the current branch", async () => {
+    const { dir, git, commit } = makeRepo();
+    const first = commit("one");
+    git("tag", "light");
+    git("tag", "-a", "-m", "annotated", "v1");
+    git("branch", "feature");
+    const second = commit("two");
+
+    const refs = await listRefs(dir);
+
+    expect(refs.current).toBe("main");
+    expect(refs.branches).toEqual(expect.arrayContaining([{ name: "main", sha: second }, { name: "feature", sha: first }]));
+    expect(refs.branches).toHaveLength(2);
+    expect(refs.tags).toEqual(expect.arrayContaining([{ name: "light", sha: first }, { name: "v1", sha: first }]));
+    expect(refs.tags).toHaveLength(2);
+  });
+
+  it("has no current branch on a detached head", async () => {
+    const { dir, git, commit } = makeRepo();
+    const first = commit("one");
+    commit("two");
+    git("checkout", "-q", "--detach", first);
+
+    expect((await listRefs(dir)).current).toBeNull();
+  });
+
+  it("is empty for a repository with no commits yet", async () => {
+    const { dir } = makeRepo();
+
+    expect(await listRefs(dir)).toEqual({ current: "main", branches: [], tags: [], truncated: false });
+  });
+
+  it("flags a list cut at the most recent 100 refs", async () => {
+    const { dir, git, commit } = makeRepo();
+    commit("one");
+    for (let i = 0; i < 101; i++) git("branch", `b${i}`);
+
+    const refs = await listRefs(dir);
+
+    expect(refs.branches).toHaveLength(100);
+    expect(refs.truncated).toBe(true);
+  });
+
+  it("skips tags that do not point at a commit", async () => {
+    const { dir, git, commit } = makeRepo();
+    commit("one");
+    const blob = git("hash-object", "-w", "file.txt");
+    git("tag", "blobtag", blob);
+
+    expect((await listRefs(dir)).tags).toEqual([]);
   });
 });

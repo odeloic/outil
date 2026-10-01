@@ -53,6 +53,18 @@ export type CommitSummary = {
   subject: string
 }
 
+export type RefEntry = {
+  name: string
+  sha: string
+}
+
+export type RefList = {
+  current: string | null
+  branches: RefEntry[]
+  tags: RefEntry[]
+  truncated: boolean
+}
+
 export type HistoryPage = {
   commits: CommitSummary[]
   hasMore: boolean

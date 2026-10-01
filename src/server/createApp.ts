@@ -6,7 +6,7 @@ import { listModels } from "./agents/models.ts";
 import { promptContext } from "./agents/prompt.ts";
 import { getFileDiff } from "./diff.ts";
 import { publishActivity, publishingStore, subscribe } from "./events.ts";
-import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
+import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, listRefs, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
 import {
   addFollowUp,
@@ -74,6 +74,7 @@ export function createApp(cwd: string) {
 
   return createRoutes({
     repoInfo: () => getRepoInfo(cwd),
+    listRefs: () => listRefs(cwd),
     resolveCommit: (ref) => resolveCommit(cwd, ref),
     getCommit: boundGetCommit,
     listChanges: boundListChanges,

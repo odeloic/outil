@@ -1,4 +1,5 @@
 import { detectAgents } from "./agents/detect.ts";
+import { listModels } from "./agents/models.ts";
 import { getFileDiff } from "./diff.ts";
 import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
@@ -33,5 +34,6 @@ export function createApp(cwd: string) {
     editDraft: (target, id, body) => store.update(target, (review) => editDraft(review, id, body)),
     deleteDraft: (target, id) => store.update(target, (review) => deleteDraft(review, id)),
     detectAgents: () => detectAgents(),
+    listModels: (agent) => listModels(agent),
   });
 }

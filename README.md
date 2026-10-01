@@ -47,7 +47,11 @@ worktree).
 - git
 - To ask a coding agent for a review, [Claude Code](https://www.npmjs.com/package/@anthropic-ai/claude-code)
   or [Codex](https://www.npmjs.com/package/@openai/codex) installed and signed in. Check availability any
-  time from the Agents panel in the review's left rail.
+  time from the Agents panel in the review's left rail. Your choice of agent and model is
+  remembered in the browser (`localStorage`) and restored the next time you open the tool.
+  Codex's model list comes from `codex debug models`, which reads your Codex config; runs
+  themselves ignore user config (`--ignore-user-config`), so a model from a custom provider
+  in your config may be listed but not actually run.
 
 ## Develop
 

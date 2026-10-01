@@ -4,6 +4,7 @@ import { delimiter, join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { AgentId, AgentStatus } from "../../shared/api.ts";
+import { AGENT_NAMES } from "../../shared/agents.ts";
 
 const exec = promisify(execFile);
 
@@ -19,7 +20,7 @@ type AgentDef = {
 const AGENTS: AgentDef[] = [
   {
     id: "claude",
-    name: "Claude Code",
+    name: AGENT_NAMES.claude,
     bin: "claude",
     install: "Install it with `npm install -g @anthropic-ai/claude-code`.",
     login: "Run `claude auth login`.",
@@ -30,7 +31,7 @@ const AGENTS: AgentDef[] = [
   },
   {
     id: "codex",
-    name: "Codex",
+    name: AGENT_NAMES.codex,
     bin: "codex",
     install: "Install it with `npm install -g @openai/codex`.",
     login: "Run `codex login`.",

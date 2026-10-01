@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Run, Thread, ThreadAnchor } from '../../shared/api.ts'
+import { AGENT_NAMES } from '../../shared/agents.ts'
 import { threadStatus } from '../../shared/review.ts'
 import { Avatar, Button, Note, StatusChip } from '../design-system'
 import { anchorLabel } from './anchorLabel.ts'
@@ -48,12 +49,20 @@ export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartE
             onCancel={() => onCancelEdit(thread.anchor)}
             ariaLabel={`Edit comment on ${label}`}
           />
+        ) : message.author === 'agent' ? (
+          <div className="thread-card__message" key={message.id}>
+            <Avatar kind="agent" />
+            <div className="thread-card__agent-bubble">
+              <p className="thread-card__agent-header">{`${AGENT_NAMES[message.agent]} · ${message.model}`}</p>
+              <p className="thread-card__body">{message.body}</p>
+            </div>
+          </div>
         ) : (
           <div className="thread-card__message" key={message.id}>
-            <Avatar kind={message.author} initials={message.author === 'reviewer' ? reviewerInitials : undefined} />
+            <Avatar kind="reviewer" initials={reviewerInitials} />
             <div className="thread-card__body-wrap">
               <p className="thread-card__body">{message.body}</p>
-              {message.author === 'reviewer' && message.state === 'draft' && (
+              {message.state === 'draft' && (
                 <span className="thread-card__actions">
                   <Button variant="ghost" onClick={() => onStartEdit(message.id)} aria-label={`Edit comment on ${label}`}>
                     Edit

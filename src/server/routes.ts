@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import type {
+  AgentId,
+  AgentModel,
   AgentStatus,
   ApiError,
   ChangeSet,
@@ -32,6 +34,7 @@ export type RouteDeps = {
   editDraft: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
   deleteDraft: (target: ReviewTarget, id: string) => Promise<Review>;
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
+  listModels: (agent: AgentId) => Promise<AgentModel[]>;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -139,6 +142,10 @@ const targetOnlyBody = validator("json", (body, c): { target: ReviewTarget } | R
 
 const agentsQuery = validator("query", (query): { refresh?: string } => (query.refresh === "1" ? { refresh: "1" } : {}));
 
+function isAgentId(value: string): value is AgentId {
+  return value === "claude" || value === "codex";
+}
+
 export const MAX_HISTORY_PAGE = 200;
 
 function count(value: unknown, fallback: number, max: number): number | null {
@@ -183,8 +190,10 @@ export function createRoutes({
   editDraft,
   deleteDraft,
   detectAgents,
+  listModels,
 }: RouteDeps) {
   let agentsCache: Promise<AgentStatus[]> | null = null;
+  const modelsCache = new Map<AgentId, Promise<AgentModel[]>>();
   return new Hono()
     .get("/api/repo", async (c) => {
       try {
@@ -294,10 +303,36 @@ export function createRoutes({
     .get("/api/agents", agentsQuery, async (c) => {
       const refresh = c.req.valid("query").refresh === "1";
       try {
-        if (refresh || !agentsCache) agentsCache = detectAgents(refresh);
+        if (refresh || !agentsCache) {
+          agentsCache = detectAgents(refresh);
+          modelsCache.clear();
+        }
         return c.json(await agentsCache, 200);
       } catch (err) {
         agentsCache = null;
+        return c.json(toApiError(err), 500);
+      }
+    })
+    .get("/api/agents/:id/models", async (c) => {
+      const id = c.req.param("id");
+      if (!isAgentId(id)) {
+        return c.json({ error: `"${id}" is not a supported agent.` } satisfies ApiError, 400);
+      }
+      try {
+        if (!agentsCache) agentsCache = detectAgents(false);
+        const statuses = await agentsCache;
+        const status = statuses.find((candidate) => candidate.id === id);
+        if (!status || status.state !== "ready") {
+          return c.json({ error: `${status?.name ?? id} is not ready.` } satisfies ApiError, 409);
+        }
+        let cached = modelsCache.get(id);
+        if (!cached) {
+          cached = listModels(id);
+          modelsCache.set(id, cached);
+        }
+        return c.json(await cached, 200);
+      } catch (err) {
+        modelsCache.delete(id);
         return c.json(toApiError(err), 500);
       }
     });

@@ -1,8 +1,9 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import type { AgentStatus } from '../../shared/api.ts'
-import { Avatar, Button, Note, Popover, Spinner, Tag } from '../design-system'
-import { useAgents } from './useAgents.ts'
+import type { AgentModel, AgentStatus } from '../../shared/api.ts'
+import { AGENT_NAMES } from '../../shared/agents.ts'
+import { Avatar, Button, MenuOption, Note, Popover, Spinner, Tag } from '../design-system'
+import { useAgentChoice } from './useAgentChoice.ts'
 import './AgentPanel.css'
 
 const STATE_LABEL: Record<AgentStatus['state'], string> = {
@@ -15,17 +16,14 @@ function renderFix(fix: string): ReactNode {
   return fix.split('`').map((part, index) => (index % 2 === 1 ? <code key={index}>{part}</code> : part))
 }
 
-function AgentRow({ agent }: { agent: AgentStatus }) {
-  return (
-    <li className={`agent-panel__row${agent.state === 'ready' ? '' : ' agent-panel__row--unavailable'}`}>
-      <span className="agent-panel__row-head">
-        <span className="ods-dia" aria-hidden="true" />
-        <span className="agent-panel__row-name">{agent.name}</span>
-        <Tag>{STATE_LABEL[agent.state]}</Tag>
-      </span>
-      {agent.state !== 'ready' && agent.fix && <p className="agent-panel__fix">{renderFix(agent.fix)}</p>}
-    </li>
-  )
+function moveBetweenOptions(event: ReactKeyboardEvent<HTMLUListElement>) {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)')]
+  const index = options.indexOf(document.activeElement as HTMLButtonElement)
+  if (options.length === 0) return
+  event.preventDefault()
+  const step = event.key === 'ArrowDown' ? 1 : -1
+  options[(index + step + options.length) % options.length].focus()
 }
 
 function CheckAgainButton({ loading, onClick }: { loading: boolean; onClick: () => void }) {
@@ -37,8 +35,48 @@ function CheckAgainButton({ loading, onClick }: { loading: boolean; onClick: () 
   )
 }
 
+function AgentRow({ status, checked, onSelect }: { status: AgentStatus; checked: boolean; onSelect: () => void }) {
+  return (
+    <li className="agent-panel__row">
+      <MenuOption
+        checked={checked}
+        disabled={status.state !== 'ready'}
+        icon={<span className="ods-dia" aria-hidden="true" />}
+        trailing={status.state !== 'ready' ? <Tag>{STATE_LABEL[status.state]}</Tag> : undefined}
+        onSelect={onSelect}
+      >
+        {status.name}
+      </MenuOption>
+      {status.state !== 'ready' && status.fix && <p className="agent-panel__fix">{renderFix(status.fix)}</p>}
+    </li>
+  )
+}
+
+function ModelRow({ model, checked, onSelect }: { model: AgentModel; checked: boolean; onSelect: () => void }) {
+  return (
+    <li className="agent-panel__row">
+      <MenuOption checked={checked} onSelect={onSelect}>
+        {model.label}
+      </MenuOption>
+    </li>
+  )
+}
+
 export function AgentPanel() {
-  const { agents, ready, loading, error, recheck } = useAgents()
+  const {
+    agents,
+    ready,
+    agentsLoading,
+    agentsError,
+    recheckAgents,
+    agent,
+    model,
+    models,
+    modelsLoading,
+    modelsError,
+    selectAgent,
+    selectModel,
+  } = useAgentChoice()
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -65,7 +103,10 @@ export function AgentPanel() {
   }, [])
 
   const toggle = () => {
-    if (open) return close()
+    if (open) {
+      close()
+      return
+    }
     position()
     setOpen(true)
   }
@@ -91,7 +132,7 @@ export function AgentPanel() {
     }
   }, [shown, close, position])
 
-  if (loading && agents.length === 0) {
+  if (agentsLoading && agents.length === 0) {
     return (
       <div className="agent-panel agent-panel--loading">
         <Spinner />
@@ -100,24 +141,24 @@ export function AgentPanel() {
     )
   }
 
-  if (error) {
+  if (agentsError) {
     return (
-      <Note variant="failure" action={<CheckAgainButton loading={loading} onClick={recheck} />}>
-        {error}
+      <Note variant="failure" action={<CheckAgainButton loading={agentsLoading} onClick={recheckAgents} />}>
+        {agentsError}
       </Note>
     )
   }
 
-  if (ready.length === 0) {
+  if (!agent) {
     return (
-      <Note variant="hint" action={<CheckAgainButton loading={loading} onClick={recheck} />}>
+      <Note variant="hint" action={<CheckAgainButton loading={agentsLoading} onClick={recheckAgents} />}>
         <span className="agent-panel__empty">
           No coding agent is ready. Install Claude Code or Codex and sign in, then check again.
           <ul className="agent-panel__list">
-            {agents.map((agent) => (
-              <li key={agent.id}>
-                {agent.name}: {STATE_LABEL[agent.state]}
-                {agent.fix && <span> — {renderFix(agent.fix)}</span>}
+            {agents.map((status) => (
+              <li key={status.id}>
+                {status.name}: {STATE_LABEL[status.state]}
+                {status.fix && <span> — {renderFix(status.fix)}</span>}
               </li>
             ))}
           </ul>
@@ -126,11 +167,12 @@ export function AgentPanel() {
     )
   }
 
+  const notReady = agents.length - ready.length
+  const modelLabel = models.find((candidate) => candidate.id === model)?.label ?? model
+
   return (
     <div className="agent-panel" ref={wrapperRef}>
       <Avatar kind="agent" />
-      <span className="agent-panel__names">{ready.map((agent) => agent.name).join(', ')}</span>
-      {agents.length > ready.length && <Tag>{agents.length - ready.length} not ready</Tag>}
       <Button
         variant="ghost"
         className="agent-panel__toggle"
@@ -138,24 +180,47 @@ export function AgentPanel() {
         aria-haspopup="dialog"
         onClick={toggle}
       >
-        Agents
+        <span className="agent-panel__choice">
+          <span className="agent-panel__choice-name">{AGENT_NAMES[agent]}</span>
+          {modelLabel && <span className="agent-panel__model">{modelLabel}</span>}
+        </span>
       </Button>
+      {notReady > 0 && <Tag>{notReady} not ready</Tag>}
       {shown &&
         pos &&
         createPortal(
           <div className="agent-panel__popover" style={{ top: pos.top, left: pos.left }}>
-            <Popover ariaLabel="Agent availability">
+            <Popover ariaLabel="Choose the agent and model">
               <div
                 ref={focusPopover}
                 tabIndex={-1}
                 className="agent-panel__popover-body"
               >
-                <ul className="agent-panel__rows">
-                  {agents.map((agent) => (
-                    <AgentRow key={agent.id} agent={agent} />
-                  ))}
-                </ul>
-                <CheckAgainButton loading={loading} onClick={recheck} />
+                <div className="agent-panel__section">
+                  <p className="agent-panel__section-title">Agent</p>
+                  <ul className="agent-panel__rows" role="radiogroup" aria-label="Agent" onKeyDown={moveBetweenOptions}>
+                    {agents.map((status) => (
+                      <AgentRow key={status.id} status={status} checked={status.id === agent} onSelect={() => selectAgent(status.id)} />
+                    ))}
+                  </ul>
+                </div>
+                <div className="agent-panel__section">
+                  <p className="agent-panel__section-title">Model</p>
+                  {modelsLoading && models.length === 0 && (
+                    <p className="agent-panel__models-loading">
+                      <Spinner /> Loading models…
+                    </p>
+                  )}
+                  {modelsError && <Note variant="failure">{modelsError}</Note>}
+                  {models.length > 0 && (
+                    <ul className="agent-panel__rows" role="radiogroup" aria-label="Model" onKeyDown={moveBetweenOptions}>
+                      {models.map((candidate) => (
+                        <ModelRow key={candidate.id} model={candidate} checked={candidate.id === model} onSelect={() => selectModel(candidate.id)} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <CheckAgainButton loading={agentsLoading} onClick={recheckAgents} />
               </div>
             </Popover>
           </div>,

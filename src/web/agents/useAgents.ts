@@ -30,6 +30,10 @@ async function load(refresh: boolean) {
   }
 }
 
+function recheck(): Promise<void> {
+  return load(true)
+}
+
 function subscribe(listener: () => void) {
   if (!started) {
     started = true
@@ -48,7 +52,7 @@ export type UseAgents = {
   ready: AgentStatus[]
   loading: boolean
   error: string | null
-  recheck: () => void
+  recheck: () => Promise<void>
 }
 
 export function useAgents(): UseAgents {
@@ -56,6 +60,6 @@ export function useAgents(): UseAgents {
   return {
     ...snapshot,
     ready: snapshot.agents.filter((agent) => agent.state === 'ready'),
-    recheck: () => load(true),
+    recheck,
   }
 }

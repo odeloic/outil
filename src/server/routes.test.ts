@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentStatus, Review, ReviewTarget } from "../shared/api.ts";
+import type { AgentModel, AgentStatus, Review, ReviewTarget } from "../shared/api.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
 import { createRoutes, type RouteDeps } from "./routes.ts";
@@ -21,6 +21,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     editDraft: unstubbed,
     deleteDraft: unstubbed,
     detectAgents: unstubbed,
+    listModels: unstubbed,
     ...overrides,
   });
 }
@@ -561,3 +562,82 @@ describe("GET /api/agents", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("GET /api/agents/:id/models", () => {
+  const ready: AgentStatus[] = [
+    { id: "claude", name: "Claude Code", state: "ready", fix: null },
+    { id: "codex", name: "Codex", state: "signed-out", fix: "Run `codex login`." },
+  ];
+  const models: AgentModel[] = [{ id: "opus", label: "Opus" }];
+
+  it("rejects an id other than claude or codex", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/api/agents/gemini/models");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns the models for a ready agent", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => ready,
+      listModels: async (agent) => {
+        calls++;
+        expect(agent).toBe("claude");
+        return models;
+      },
+    });
+
+    const res = await app.request("/api/agents/claude/models");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(models);
+    expect(calls).toBe(1);
+  });
+
+  it("caches the models for an agent across requests", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => ready,
+      listModels: async () => {
+        calls++;
+        return models;
+      },
+    });
+
+    await app.request("/api/agents/claude/models");
+    await app.request("/api/agents/claude/models");
+    expect(calls).toBe(1);
+  });
+
+  it("returns 409 when the agent is not ready", async () => {
+    const app = makeApp({ detectAgents: async () => ready, listModels: unstubbedListModels });
+
+    const res = await app.request("/api/agents/codex/models");
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Codex is not ready." });
+  });
+
+  it("reports listModels failures as a 500 and retries on the next call", async () => {
+    let calls = 0;
+    const app = makeApp({
+      detectAgents: async () => ready,
+      listModels: async () => {
+        calls++;
+        if (calls === 1) throw new Error("codex debug models failed");
+        return models;
+      },
+    });
+
+    const failed = await app.request("/api/agents/claude/models");
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toEqual({ error: "codex debug models failed" });
+
+    const ok = await app.request("/api/agents/claude/models");
+    expect(ok.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+});
+
+async function unstubbedListModels(): Promise<AgentModel[]> {
+  throw new Error("not stubbed");
+}

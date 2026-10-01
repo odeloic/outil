@@ -26,7 +26,7 @@ import { Button, StatusChip, Avatar } from '../design-system'
 
 <Button variant="primary">Send 3 drafts</Button>
 <StatusChip status="answered" unread />
-<Avatar kind="agent" />
+<Avatar initials="LI" />
 ```
 
 Use only `ods-*` classes and the CSS custom properties from `tokens/*.css` — never a raw hex value or an ad hoc pixel size. If a screen needs something not in the list below, that's a sign a new primitive is needed, not a one-off style.
@@ -62,7 +62,7 @@ Reviewer: dark square avatar with initials, plain message background. Agent: the
 
 ## Icons
 
-Codicons (`@vscode/codicons`, CC-BY-4.0) through the `Icon` primitive: chevron-down/right, arrow-swap, arrow-up/down, layout, check, add, warning, loading, comment-discussion. There are no sun/moon icons; the theme control is a text pill System / Light / Dark.
+Codicons (`@vscode/codicons`, CC-BY-4.0) through the `Icon` primitive: chevron-down/right, arrow-swap, arrow-up/down, layout, check, add, warning, loading, comment-discussion, agent. There are no sun/moon icons; the theme control is a text pill System / Light / Dark.
 
 ## The 21 primitives
 

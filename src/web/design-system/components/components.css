@@ -171,15 +171,6 @@
   }
 }
 
-.ods-dia {
-  width: 7px;
-  height: 7px;
-  background: currentColor;
-  transform: rotate(45deg);
-  flex: none;
-  display: inline-block;
-}
-
 .ods-avatar {
   width: var(--ods-logo-size);
   height: var(--ods-logo-size);
@@ -189,18 +180,6 @@
   font: var(--ods-weight-semibold) var(--ods-text-2xs)/var(--ods-logo-size) var(--ods-font-ui);
   text-align: center;
   flex: none;
-}
-
-.ods-avatar--agent {
-  background: none;
-  display: grid;
-  place-items: center;
-  color: var(--ods-fg);
-}
-.ods-avatar--agent .ods-dia {
-  width: 13px;
-  height: 13px;
-  border-radius: 2px;
 }
 
 .ods-kbd {
@@ -489,12 +468,6 @@
 .ods-menu-option:disabled {
   color: var(--ods-fg-3);
   cursor: not-allowed;
-}
-.ods-menu-option .ods-dia {
-  color: var(--ods-fg);
-}
-.ods-menu-option:disabled .ods-dia {
-  color: var(--ods-fg-3);
 }
 .ods-menu-option__trailing {
   margin-left: auto;

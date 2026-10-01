@@ -197,7 +197,7 @@ export function ThreadView({
             className={`thread-card__message${message.state === 'draft' && !isNewDraftThread ? ' thread-card__message--draft' : ''}`}
             key={message.id}
           >
-            <Avatar kind="reviewer" initials={reviewerInitials} />
+            <Avatar initials={reviewerInitials} />
             <div className="thread-card__body-wrap">
               <p className="thread-card__body">{message.body}</p>
               {message.state === 'draft' && !thread.resolved && (

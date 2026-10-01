@@ -20,7 +20,7 @@ See `StatusChip` in `src/web/design-system/components/status/StatusChip.tsx`.
 
 Two rules make the distinction survive without color:
 
-- **Shape.** The reviewer's avatar is a dark square with initials (`Avatar kind="reviewer"`). The agent's is the generic agent mark (the `agent` codicon on a `--ods-surface` tile with a 1px `--ods-line` ring, `AgentLogo`), identical for every agent and always paired with the agent's name; no vendor logos ship.
+- **Shape.** The reviewer's avatar is a dark square with initials (`Avatar`). The agent's is the generic agent mark (the `agent` codicon on a `--ods-surface` tile with a 1px `--ods-line` ring, `AgentLogo`), identical for every agent and always paired with the agent's name; no vendor logos ship.
 - **Tint.** An agent's message, or its summary, sits on `--ods-sunken` with `--ods-line` and `--ods-fg` text. A reviewer's message is plain.
 
 ## Additions and removals

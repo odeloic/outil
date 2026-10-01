@@ -18,6 +18,7 @@ import type {
   ResolvedCommit,
   ThreadAnchor,
 } from "../shared/api.ts";
+import { MODEL_PATTERN } from "../shared/agents.ts";
 import { RefError } from "./errors.ts";
 import { ReviewError } from "./reviews.ts";
 
@@ -35,6 +36,8 @@ export type RouteDeps = {
   deleteDraft: (target: ReviewTarget, id: string) => Promise<Review>;
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
+  send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
+  markThreadRead: (target: ReviewTarget, id: string) => Promise<Review>;
 };
 
 function toApiError(err: unknown): ApiError {
@@ -146,6 +149,17 @@ function isAgentId(value: string): value is AgentId {
   return value === "claude" || value === "codex";
 }
 
+const AGENT_IDS = new Set(["claude", "codex"]);
+
+const sendBody = validator("json", (body, c): { target: ReviewTarget; agent: AgentId; model: string } | Response => {
+  const { target, agent, model } = (body ?? {}) as Record<string, unknown>;
+  const trimmedModel = typeof model === "string" ? model.trim() : "";
+  if (!isReviewTarget(target) || !AGENT_IDS.has(agent as string) || !MODEL_PATTERN.test(trimmedModel)) {
+    return c.json({ error: "A send needs a target, an agent (claude or codex), and a model." } satisfies ApiError, 400);
+  }
+  return { target, agent: agent as AgentId, model: trimmedModel };
+});
+
 export const MAX_HISTORY_PAGE = 200;
 
 function count(value: unknown, fallback: number, max: number): number | null {
@@ -191,8 +205,9 @@ export function createRoutes({
   deleteDraft,
   detectAgents,
   listModels,
+  send,
+  markThreadRead,
 }: RouteDeps) {
-  let agentsCache: Promise<AgentStatus[]> | null = null;
   const modelsCache = new Map<AgentId, Promise<AgentModel[]>>();
   return new Hono()
     .get("/api/repo", async (c) => {
@@ -303,13 +318,10 @@ export function createRoutes({
     .get("/api/agents", agentsQuery, async (c) => {
       const refresh = c.req.valid("query").refresh === "1";
       try {
-        if (refresh || !agentsCache) {
-          agentsCache = detectAgents(refresh);
-          modelsCache.clear();
-        }
-        return c.json(await agentsCache, 200);
+        const statuses = await detectAgents(refresh);
+        if (refresh) modelsCache.clear();
+        return c.json(statuses, 200);
       } catch (err) {
-        agentsCache = null;
         return c.json(toApiError(err), 500);
       }
     })
@@ -319,8 +331,7 @@ export function createRoutes({
         return c.json({ error: `"${id}" is not a supported agent.` } satisfies ApiError, 400);
       }
       try {
-        if (!agentsCache) agentsCache = detectAgents(false);
-        const statuses = await agentsCache;
+        const statuses = await detectAgents(false);
         const status = statuses.find((candidate) => candidate.id === id);
         if (!status || status.state !== "ready") {
           return c.json({ error: `${status?.name ?? id} is not ready.` } satisfies ApiError, 409);
@@ -334,6 +345,22 @@ export function createRoutes({
       } catch (err) {
         modelsCache.delete(id);
         return c.json(toApiError(err), 500);
+      }
+    })
+    .post("/api/review/send", sendBody, async (c) => {
+      const { target, agent, model } = c.req.valid("json");
+      try {
+        return c.json(await send(target, agent, model), 200);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
+      }
+    })
+    .post("/api/review/threads/:id/read", targetOnlyBody, async (c) => {
+      const { target } = c.req.valid("json");
+      try {
+        return c.json(await markThreadRead(target, c.req.param("id")), 200);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
       }
     });
 }

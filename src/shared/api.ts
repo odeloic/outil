@@ -153,6 +153,11 @@ export type Thread = {
 
 export type RunState = "running" | "done" | "failed" | "timed-out" | "cancelled" | "interrupted"
 
+export type RunOwner = {
+  pid: number
+  instance: string
+}
+
 export type Run = {
   id: string
   agent: AgentId
@@ -163,6 +168,7 @@ export type Run = {
   endedAt: string | null
   summary: string | null
   error: string | null
+  owner: RunOwner | null
 }
 
 export type ReviewTarget = { kind: "commit"; sha: string } | { kind: "compare"; base: string; head: string }

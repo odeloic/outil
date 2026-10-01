@@ -60,3 +60,9 @@ export function useAgentModels(agent: AgentId | null): ModelsState {
   }, [agent])
   return useSyncExternalStore(subscribe, getSnapshot)
 }
+
+export function useModelLabel(agent: AgentId | null, modelId: string | null): string | null {
+  const { models } = useAgentModels(agent)
+  if (!modelId) return null
+  return models.find((candidate) => candidate.id === modelId)?.label ?? modelId
+}

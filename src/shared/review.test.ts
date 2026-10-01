@@ -42,6 +42,7 @@ function run(overrides: Partial<Run> = {}): Run {
     endedAt: null,
     summary: null,
     error: null,
+    owner: null,
     ...overrides,
   }
 }

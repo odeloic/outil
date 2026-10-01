@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { createInterface } from "node:readline";
 import type { AgentId } from "../../shared/api.ts";
+import { MODEL_PATTERN } from "../../shared/agents.ts";
 import { ANSWER_SCHEMA } from "./answer.ts";
 import { AgentRunError } from "./errors.ts";
 
@@ -17,8 +18,6 @@ export type RunAgentOptions = {
   timeoutMs?: number;
   onActivity?: (text: string) => void;
 };
-
-const MODEL_PATTERN = /^[A-Za-z0-9][\w.:\-[\]]*$/;
 
 type LiveRun = { pid: number; stop: () => void };
 

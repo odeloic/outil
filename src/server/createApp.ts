@@ -1,31 +1,54 @@
+import { askAgent } from "./agents/ask.ts";
+import { createAgentCache, createModelsCache } from "./agents/cache.ts";
 import { detectAgents } from "./agents/detect.ts";
 import { listModels } from "./agents/models.ts";
+import { promptContext } from "./agents/prompt.ts";
 import { getFileDiff } from "./diff.ts";
 import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
-import { assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft } from "./reviews.ts";
+import { assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft, markThreadRead } from "./reviews.ts";
 import { createFileStore } from "./reviewFiles.ts";
+import { createRunner, type Runner } from "./runs.ts";
+
+const runners = new Set<Runner>();
+
+export function stopAllRunners(): Promise<void> {
+  return Promise.all([...runners].map((runner) => runner.stopAll())).then(() => undefined);
+}
 
 export function createApp(cwd: string) {
   const boundListChanges = (base: string | null, head: string) => listChanges(cwd, base, head);
+  const boundGetCommit = (sha: string) => getCommit(cwd, sha);
   const store = createFileStore(
     cwd,
     createTargetResolver({
       assertCommits: (...shas) => assertCommits(cwd, ...shas),
-      getCommit: (sha) => getCommit(cwd, sha),
+      getCommit: boundGetCommit,
       compareCommits: (base, head) => compareCommits(cwd, base, head),
     }),
   );
+  const agentCache = createAgentCache(() => detectAgents());
+  const modelsCache = createModelsCache((agent) => listModels(agent));
+  const runner = createRunner({
+    store,
+    ask: (options) => askAgent({ repoRoot: cwd, ...options }),
+    agents: () => agentCache.list(),
+    listModels: (agent) => modelsCache.list(agent),
+    context: (review) => promptContext(cwd, review, boundGetCommit, boundListChanges),
+    onChange: () => {},
+    onActivity: () => {},
+  });
+  runners.add(runner);
 
   return createRoutes({
     repoInfo: () => getRepoInfo(cwd),
     resolveCommit: (ref) => resolveCommit(cwd, ref),
-    getCommit: (sha) => getCommit(cwd, sha),
+    getCommit: boundGetCommit,
     listChanges: boundListChanges,
     getFileDiff: (request) => getFileDiff(cwd, request),
     listCommits: (query) => listCommits(cwd, query),
     compareCommits: (base, head) => compareCommits(cwd, base, head),
-    getReview: (target) => store.get(target),
+    getReview: (target) => runner.get(target),
     createThread: (target, anchor, body) =>
       store.update(target, async (review) => {
         await assertAnchorInDiff({ listChanges: boundListChanges }, review, anchor.path);
@@ -33,7 +56,9 @@ export function createApp(cwd: string) {
       }),
     editDraft: (target, id, body) => store.update(target, (review) => editDraft(review, id, body)),
     deleteDraft: (target, id) => store.update(target, (review) => deleteDraft(review, id)),
-    detectAgents: () => detectAgents(),
+    detectAgents: (refresh) => agentCache.list(refresh),
     listModels: (agent) => listModels(agent),
+    send: (target, agent, model) => runner.send(target, agent, model),
+    markThreadRead: (target, id) => store.update(target, (review) => markThreadRead(review, id)),
   });
 }

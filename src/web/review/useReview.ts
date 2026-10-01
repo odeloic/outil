@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Review, ReviewTarget, ThreadAnchor } from '../../shared/api.ts'
+import type { AgentId, Review, ReviewTarget, ThreadAnchor } from '../../shared/api.ts'
 import { ApiRequestError, client, unwrap } from '../api.ts'
+
+const POLL_MS = 2000
 
 export function targetKey(target: ReviewTarget): string {
   return target.kind === 'commit' ? target.sha : `${target.base}..${target.head}`
@@ -22,6 +24,8 @@ export type UseReview = {
   createThread: (anchor: ThreadAnchor, body: string) => Promise<Review>
   editDraft: (id: string, body: string) => Promise<Review>
   deleteDraft: (id: string) => Promise<Review>
+  send: (agent: AgentId, model: string) => Promise<Review>
+  markRead: (threadId: string) => Promise<Review>
 }
 
 export function useReview(target: ReviewTarget): UseReview {
@@ -63,6 +67,14 @@ export function useReview(target: ReviewTarget): UseReview {
   useEffect(() => {
     fetchReview(key)
   }, [key, fetchReview])
+
+  const running = state && state.key === key && state.review.runs.some((run) => run.state === 'running')
+
+  useEffect(() => {
+    if (!running) return
+    const interval = setInterval(() => void fetchReview(key), POLL_MS)
+    return () => clearInterval(interval)
+  }, [running, key, fetchReview])
 
   useEffect(() => {
     let cancelled = false
@@ -118,6 +130,20 @@ export function useReview(target: ReviewTarget): UseReview {
     [applyMutation],
   )
 
+  const send = useCallback(
+    (agent: AgentId, model: string) =>
+      applyMutation(unwrap(client.api.review.send.$post({ json: { target: targetRef.current, agent, model } }))),
+    [applyMutation],
+  )
+
+  const markRead = useCallback(
+    (threadId: string) =>
+      applyMutation(
+        unwrap(client.api.review.threads[':id'].read.$post({ param: { id: threadId }, json: { target: targetRef.current } })),
+      ),
+    [applyMutation],
+  )
+
   return {
     review: state && state.key === key ? state.review : null,
     error: errorState && errorState.key === key ? errorState.message : null,
@@ -125,5 +151,7 @@ export function useReview(target: ReviewTarget): UseReview {
     createThread,
     editDraft,
     deleteDraft,
+    send,
+    markRead,
   }
 }

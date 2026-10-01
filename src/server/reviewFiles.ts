@@ -73,6 +73,13 @@ function isThread(value: unknown): value is Thread {
   );
 }
 
+function isRunOwner(value: unknown): value is Run["owner"] {
+  if (value === null || value === undefined) return true;
+  if (typeof value !== "object") return false;
+  const owner = value as Record<string, unknown>;
+  return typeof owner.pid === "number" && typeof owner.instance === "string";
+}
+
 function isRun(value: unknown): value is Run {
   if (typeof value !== "object" || value === null) return false;
   const run = value as Record<string, unknown>;
@@ -82,7 +89,8 @@ function isRun(value: unknown): value is Run {
     typeof run.model === "string" &&
     RUN_STATES.has(run.state as string) &&
     Array.isArray(run.threadIds) &&
-    run.threadIds.every((id) => typeof id === "string")
+    run.threadIds.every((id) => typeof id === "string") &&
+    isRunOwner(run.owner)
   );
 }
 

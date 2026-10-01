@@ -119,6 +119,18 @@ export function deleteDraft(review: Review, id: string): Review {
   };
 }
 
+export function markThreadRead(review: Review, threadId: string): Review {
+  const index = review.threads.findIndex((thread) => thread.id === threadId);
+  if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);
+  const thread = review.threads[index];
+  const messages = thread.messages.map((message) =>
+    message.author === "agent" && !message.read ? { ...message, read: true } : message,
+  );
+  const threads = review.threads.slice();
+  threads[index] = { ...thread, messages };
+  return { ...review, threads };
+}
+
 export type AnchorCheckDeps = { listChanges: (base: string | null, head: string) => Promise<ChangeSet> };
 
 export async function assertAnchorInDiff({ listChanges }: AnchorCheckDeps, review: Review, path: string): Promise<void> {

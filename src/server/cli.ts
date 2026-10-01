@@ -7,7 +7,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { stopAllRuns } from "./agents/run.ts";
 import { parseCli, USAGE, UsageError } from "./args.ts";
-import { createApp } from "./createApp.ts";
+import { createApp, stopAllRunners } from "./createApp.ts";
 import { RefError } from "./errors.ts";
 import { getRepoInfo, resolveCommit } from "./git.ts";
 import { localOnly } from "./localOnly.ts";
@@ -68,13 +68,16 @@ function start(root: string, preferredPort: number, params: Record<string, strin
   listen(preferredPort);
 }
 
+const STOP_TIMEOUT_MS = 4_000;
+
 function stopOnSignal(server: Server) {
   const stop = () => {
     console.log("\nStopped.");
     stopAllRuns();
-    server.close(() => process.exit(0));
+    server.close();
     server.closeAllConnections();
-    setTimeout(() => process.exit(0), 2000).unref();
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS));
+    void Promise.race([stopAllRunners(), timeout]).then(() => process.exit(0));
   };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);

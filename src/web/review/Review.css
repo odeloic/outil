@@ -73,3 +73,52 @@
   opacity: 0.6;
   pointer-events: none;
 }
+
+.review__send {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-3);
+}
+
+.review__send-reason {
+  margin: 0;
+  color: var(--ods-fg-3);
+  font-size: var(--ods-text-2xs);
+}
+
+.review__run-summary {
+  display: flex;
+  gap: var(--ods-space-4);
+  align-items: flex-start;
+  padding: var(--ods-space-5) var(--ods-space-6);
+  background: var(--ods-agent-bg);
+  border: 1px solid var(--ods-agent-line);
+  border-radius: var(--ods-radius-md);
+  color: var(--ods-agent);
+}
+
+.review__run-summary-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ods-space-2);
+}
+
+.review__run-summary-header {
+  margin: 0;
+  font: var(--ods-weight-semibold) var(--ods-text-xs) var(--ods-font-ui);
+  color: inherit;
+}
+
+.review__run-summary-time {
+  font-weight: var(--ods-weight-regular);
+  color: var(--ods-fg-3);
+}
+
+.review__run-summary-text {
+  margin: 0;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

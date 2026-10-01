@@ -22,6 +22,8 @@ function makeApp(overrides: Partial<RouteDeps>) {
     deleteDraft: unstubbed,
     detectAgents: unstubbed,
     listModels: unstubbed,
+    send: unstubbed,
+    markThreadRead: unstubbed,
     ...overrides,
   });
 }
@@ -490,76 +492,158 @@ describe("DELETE /api/review/messages/:id", () => {
 describe("GET /api/agents", () => {
   const agents: AgentStatus[] = [{ id: "claude", name: "Claude Code", state: "ready", fix: null }];
 
-  it("caches the detection result across requests", async () => {
-    let calls = 0;
-    const app = makeApp({
-      detectAgents: async () => {
-        calls++;
-        return agents;
-      },
-    });
+  it("returns the detection result", async () => {
+    const app = makeApp({ detectAgents: async () => agents });
 
-    const first = await app.request("/api/agents");
-    const second = await app.request("/api/agents");
-    expect(first.status).toBe(200);
-    expect(await first.json()).toEqual(agents);
-    expect(await second.json()).toEqual(agents);
-    expect(calls).toBe(1);
+    const res = await app.request("/api/agents");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(agents);
   });
 
-  it("re-detects when refresh=1 is given", async () => {
-    let calls = 0;
+  it("passes refresh=1 through as true, and its absence as false", async () => {
+    const calls: boolean[] = [];
     const app = makeApp({
-      detectAgents: async () => {
-        calls++;
+      detectAgents: async (refresh) => {
+        calls.push(refresh);
         return agents;
       },
     });
 
     await app.request("/api/agents");
     await app.request("/api/agents?refresh=1");
-    expect(calls).toBe(2);
+    expect(calls).toEqual([false, true]);
   });
 
-  it("shares one in-flight detection promise between concurrent calls", async () => {
-    let calls = 0;
-    let resolve!: (value: AgentStatus[]) => void;
-    const app = makeApp({
-      detectAgents: () => {
-        calls++;
-        return new Promise((res) => {
-          resolve = res;
-        });
-      },
-    });
-
-    const first = app.request("/api/agents");
-    const second = app.request("/api/agents");
-    await new Promise((r) => setTimeout(r, 0));
-    resolve(agents);
-    const [firstRes, secondRes] = await Promise.all([first, second]);
-    expect(calls).toBe(1);
-    expect(await firstRes.json()).toEqual(agents);
-    expect(await secondRes.json()).toEqual(agents);
-  });
-
-  it("reports detection failures as a 500 and retries on the next call", async () => {
-    let calls = 0;
+  it("reports detection failures as a 500", async () => {
     const app = makeApp({
       detectAgents: async () => {
-        calls++;
-        if (calls === 1) throw new Error("detection failed");
-        return agents;
+        throw new Error("detection failed");
       },
     });
 
-    const failed = await app.request("/api/agents");
-    expect(failed.status).toBe(500);
-    expect(await failed.json()).toEqual({ error: "detection failed" });
+    const res = await app.request("/api/agents");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "detection failed" });
+  });
+});
 
-    const ok = await app.request("/api/agents");
-    expect(ok.status).toBe(200);
-    expect(calls).toBe(2);
+describe("POST /api/review/send", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("sends the target, agent, and model through and returns the updated review", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      send: async (t, agent, model) => {
+        calls.push([t, agent, model]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, agent: "claude", model: "haiku" }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "claude", "haiku"]]);
+  });
+
+  it("rejects an invalid target, agent, or model", async () => {
+    const app = makeApp({});
+    const cases = [
+      { target: { kind: "commit", sha: "short" }, agent: "claude", model: "haiku" },
+      { target, agent: "gemini", model: "haiku" },
+      { target, agent: "claude", model: "" },
+      { target, agent: "claude", model: "   " },
+      { target, agent: "claude" },
+      { target, model: "haiku" },
+    ];
+    for (const json of cases) {
+      const res = await app.request("/api/review/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("maps a 409 ReviewError (agent not ready, or a run in progress) through", async () => {
+    const app = makeApp({
+      send: async () => {
+        throw new ReviewError(409, "claude is not ready to run.");
+      },
+    });
+
+    const res = await app.request("/api/review/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, agent: "claude", model: "haiku" }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("maps a 400 ReviewError (nothing to send) through", async () => {
+    const app = makeApp({
+      send: async () => {
+        throw new ReviewError(400, "There is nothing to send.");
+      },
+    });
+
+    const res = await app.request("/api/review/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, agent: "claude", model: "haiku" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/review/threads/:id/read", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("marks the thread's agent messages read", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      markThreadRead: async (t, id) => {
+        calls.push([t, id]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "t1"]]);
+  });
+
+  it("returns 404 for an unknown thread id", async () => {
+    const app = makeApp({
+      markThreadRead: async () => {
+        throw new ReviewError(404, "No thread with id t1.");
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a request without a valid target", async () => {
+    const app = makeApp({});
+
+    const res = await app.request("/api/review/threads/t1/read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
   });
 });
 

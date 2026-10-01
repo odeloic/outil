@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import type { AgentId, AgentModel, AgentStatus } from '../../shared/api.ts'
 import { loadAgentChoice, resolveAgent, resolveChoice, saveAgentChoice, type StoredChoice } from './choice.ts'
 import { reloadAgentModels, useAgentModels } from './useAgentModels.ts'
@@ -19,29 +19,39 @@ export type UseAgentChoice = {
   selectModel: (model: string) => void
 }
 
+let stored: StoredChoice | null = loadAgentChoice()
+const listeners = new Set<() => void>()
+
+function getStored(): StoredChoice | null {
+  return stored
+}
+
+function setStored(next: StoredChoice) {
+  stored = next
+  saveAgentChoice(next)
+  listeners.forEach((listener) => listener())
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
 export function useAgentChoice(): UseAgentChoice {
   const { agents, ready, loading: agentsLoading, error: agentsError, recheck } = useAgents()
-  const [stored, setStored] = useState<StoredChoice | null>(() => loadAgentChoice())
-  const agent = resolveAgent(stored, ready)
+  const current = useSyncExternalStore(subscribe, getStored)
+  const agent = resolveAgent(current, ready)
   const { models, loading: modelsLoading, error: modelsError } = useAgentModels(agent)
-  const choice = agent ? resolveChoice(stored, ready, { [agent]: models }) : null
+  const choice = agent ? resolveChoice(current, ready, { [agent]: models }) : null
 
   const selectAgent = useCallback((id: AgentId) => {
-    setStored((prev) => {
-      const next: StoredChoice = { agent: id, models: prev?.models ?? {} }
-      saveAgentChoice(next)
-      return next
-    })
+    setStored({ agent: id, models: stored?.models ?? {} })
   }, [])
 
   const selectModel = useCallback(
     (id: string) => {
       if (!agent) return
-      setStored((prev) => {
-        const next: StoredChoice = { agent, models: { ...prev?.models, [agent]: id } }
-        saveAgentChoice(next)
-        return next
-      })
+      setStored({ agent, models: { ...stored?.models, [agent]: id } })
     },
     [agent],
   )

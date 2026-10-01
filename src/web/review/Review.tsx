@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { ChangeSet, ReviewTarget, Run, Thread } from '../../shared/api.ts'
-import { draftCount } from '../../shared/review.ts'
+import type { AgentId, ChangeSet, Review as ReviewData, ReviewTarget, Run, Thread } from '../../shared/api.ts'
+import { AGENT_NAMES } from '../../shared/agents.ts'
+import { draftCount, threadStatus } from '../../shared/review.ts'
 import { AgentPanel } from '../agents/AgentPanel.tsx'
+import { useAgentChoice } from '../agents/useAgentChoice.ts'
+import { useModelLabel } from '../agents/useAgentModels.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Button, CountBadge, Note, Tabs } from '../design-system'
+import { Avatar, Button, CountBadge, Note, Tabs } from '../design-system'
+import { relativeTime } from '../format.ts'
 import { initials } from '../threads/initials.ts'
 import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
@@ -17,6 +21,93 @@ type RailTab = 'files' | 'history'
 
 const NO_THREADS: Thread[] = []
 const NO_RUNS: Run[] = []
+const FAILURE_STATES = new Set<Run['state']>(['failed', 'timed-out', 'cancelled', 'interrupted'])
+
+function sendLabel(drafts: number): string {
+  if (drafts === 0) return 'Send drafts'
+  if (drafts === 1) return 'Send 1 draft'
+  return `Send ${drafts} drafts`
+}
+
+function SendPanel({
+  threads,
+  drafts,
+  runs,
+  send,
+}: {
+  threads: Thread[]
+  drafts: number
+  runs: Run[]
+  send: (agent: AgentId, model: string) => Promise<ReviewData>
+}) {
+  const { agent, model, modelsLoading, modelsError } = useAgentChoice()
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const runningRun = runs.find((run) => run.state === 'running') ?? null
+  const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
+  const latestRunModelLabel = useModelLabel(latestRun?.agent ?? null, latestRun?.model ?? null)
+  const noReplyCount = threads.filter((thread) => threadStatus(thread, runs) === 'failed').length
+
+  const reason = !agent
+    ? 'No agent is ready — see Agents above.'
+    : modelsLoading
+      ? 'Loading models…'
+      : modelsError
+        ? modelsError
+        : drafts === 0
+          ? 'No drafts to send.'
+          : runningRun
+            ? 'Waiting for the agent…'
+            : null
+
+  const canSend = reason === null && agent !== null && model !== null
+
+  const handleSend = () => {
+    if (!agent || !model) return
+    setSending(true)
+    setSendError(null)
+    send(agent, model)
+      .catch((err: Error) => setSendError(err.message))
+      .finally(() => setSending(false))
+  }
+
+  return (
+    <div className="review__send">
+      <Button
+        variant="primary"
+        onClick={handleSend}
+        disabled={!canSend || sending}
+        aria-describedby={reason ? 'review-send-reason' : undefined}
+      >
+        {sending ? 'Sending…' : sendLabel(drafts)}
+      </Button>
+      {reason && (
+        <p id="review-send-reason" className="review__send-reason">
+          {reason}
+        </p>
+      )}
+      {drafts > 0 && noReplyCount > 0 && (
+        <p className="review__send-reason">
+          Also re-sends {noReplyCount} {noReplyCount === 1 ? 'thread' : 'threads'} with no reply.
+        </p>
+      )}
+      {sendError && <Note variant="failure">{sendError}</Note>}
+      {latestRun?.state === 'done' && (
+        <div className="review__run-summary">
+          <Avatar kind="agent" />
+          <div className="review__run-summary-body">
+            <p className="review__run-summary-header">
+              {AGENT_NAMES[latestRun.agent]} · {latestRunModelLabel ?? latestRun.model}
+              {latestRun.endedAt && <span className="review__run-summary-time"> · {relativeTime(latestRun.endedAt)}</span>}
+            </p>
+            {latestRun.summary && <p className="review__run-summary-text">{latestRun.summary}</p>}
+          </div>
+        </div>
+      )}
+      {latestRun && FAILURE_STATES.has(latestRun.state) && <Note variant="failure">{latestRun.error ?? 'The run did not finish.'}</Note>}
+    </div>
+  )
+}
 
 type Props = {
   reviewKey: string
@@ -50,7 +141,7 @@ export function Review({
   const collapsedOverrides = overrides.key === reviewKey ? overrides.map : new Map<string, boolean>()
   const [railTab, setRailTab] = useState<RailTab>('files')
   const current = useCurrentFile(changes.files.length)
-  const { review, error, reviewer, createThread, editDraft, deleteDraft } = useReview(reviewTarget)
+  const { review, error, reviewer, createThread, editDraft, deleteDraft, send, markRead } = useReview(reviewTarget)
   const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
   const threadsByPath = useMemo(() => {
     const map = new Map<string, Thread[]>()
@@ -99,6 +190,7 @@ export function Review({
             <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
             {error && <Note variant="failure">{error}</Note>}
             <AgentPanel />
+            <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} />
           </div>
           <Tabs<RailTab>
             tabs={[
@@ -147,6 +239,7 @@ export function Review({
                 onCreateThread={createThread}
                 onEditDraft={editDraft}
                 onDeleteDraft={deleteDraft}
+                onMarkRead={markRead}
               />
             )
           })}

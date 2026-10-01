@@ -97,6 +97,7 @@ describe("createFileStore", () => {
             endedAt: new Date().toISOString(),
             summary: "done",
             error: null,
+            owner: null,
           },
         ],
       };

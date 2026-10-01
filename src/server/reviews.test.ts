@@ -6,6 +6,7 @@ import {
   createThread,
   deleteDraft,
   editDraft,
+  markThreadRead,
   ReviewError,
 } from "./reviews.ts";
 
@@ -117,6 +118,54 @@ describe("deleteDraft", () => {
 
   it("throws 404 for an unknown id and 409 for a non-draft message", () => {
     expect(() => deleteDraft(emptyReview(), "nope")).toThrow(ReviewError);
+  });
+});
+
+describe("markThreadRead", () => {
+  function withAgentMessages(review: Review, threadId: string): Review {
+    return {
+      ...review,
+      threads: review.threads.map((t) =>
+        t.id !== threadId
+          ? t
+          : {
+              ...t,
+              messages: [
+                ...t.messages,
+                { id: "a1", author: "agent" as const, body: "reply", createdAt: "d", agent: "claude" as const, model: "haiku", runId: "r1", read: false },
+              ],
+            },
+      ),
+    };
+  }
+
+  it("marks every unread agent message in the thread as read", () => {
+    const created = createThread(emptyReview(), anchor, "one");
+    const withAgent = withAgentMessages(created, "t1");
+
+    const read = markThreadRead(withAgent, "t1");
+    const agentMessage = read.threads[0].messages.find((m) => m.author === "agent");
+    expect(agentMessage).toMatchObject({ read: true });
+  });
+
+  it("does not touch other threads", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = createThread(review, anchor, "two");
+    review = withAgentMessages(review, "t1");
+    review = withAgentMessages(review, "t2");
+
+    const read = markThreadRead(review, "t1");
+    const t2Agent = read.threads[1].messages.find((m) => m.author === "agent");
+    expect(t2Agent).toMatchObject({ read: false });
+  });
+
+  it("throws a 404 ReviewError for an unknown thread id", () => {
+    expect(() => markThreadRead(emptyReview(), "nope")).toThrow(ReviewError);
+    try {
+      markThreadRead(emptyReview(), "nope");
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(404);
+    }
   });
 });
 

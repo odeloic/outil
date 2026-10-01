@@ -18,6 +18,7 @@ type Props = {
   onCancelEdit: (anchor: ThreadAnchor) => void
   onSaveEdit: (id: string, body: string, anchor: ThreadAnchor) => Promise<unknown>
   onDelete: (id: string, anchor: ThreadAnchor) => Promise<unknown>
+  onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
 }
 
@@ -34,7 +35,18 @@ function AgentBubble({ message }: { message: AgentMessage }) {
   )
 }
 
-export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartEdit, onCancelEdit, onSaveEdit, onDelete, onMarkRead }: Props) {
+export function ThreadView({
+  thread,
+  runs,
+  reviewerInitials,
+  editingId,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+  onReply,
+  onMarkRead,
+}: Props) {
   const status = threadStatus(thread, runs)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -44,6 +56,12 @@ export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartE
   const unread = status === 'answered' && hasUnreadAgent
   const seenLongEnough = useVisibleFor(cardRef, 1000, unread)
   const markedIdRef = useRef<string | null>(null)
+  const isNewDraftThread = status === 'draft' && thread.messages.length === 1
+  const canReply = status === 'answered'
+  const [replyState, setReplyState] = useState<{ canReply: boolean; replying: boolean }>({ canReply, replying: false })
+  if (replyState.canReply !== canReply) setReplyState({ canReply, replying: false })
+  const replying = replyState.replying
+  const setReplying = (value: boolean) => setReplyState((prev) => ({ ...prev, replying: value }))
 
   useEffect(() => {
     if (!seenLongEnough || !unread || markedIdRef.current === thread.id) return
@@ -64,7 +82,7 @@ export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartE
   }
 
   return (
-    <div ref={cardRef} className={`thread-card${status === 'draft' ? ' thread-card--draft' : ''}`}>
+    <div ref={cardRef} className={`thread-card${isNewDraftThread ? ' thread-card--draft' : ''}`}>
       <div className="thread-card__header">
         <StatusChip status={status} unread={unread} />
         <span className="thread-card__anchor">{label}</span>
@@ -81,7 +99,10 @@ export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartE
         ) : message.author === 'agent' ? (
           <AgentBubble key={message.id} message={message} />
         ) : (
-          <div className="thread-card__message" key={message.id}>
+          <div
+            className={`thread-card__message${message.state === 'draft' && !isNewDraftThread ? ' thread-card__message--draft' : ''}`}
+            key={message.id}
+          >
             <Avatar kind="reviewer" initials={reviewerInitials} />
             <div className="thread-card__body-wrap">
               <p className="thread-card__body">{message.body}</p>
@@ -100,6 +121,14 @@ export function ThreadView({ thread, runs, reviewerInitials, editingId, onStartE
         ),
       )}
       {deleteError && <Note variant="failure">{deleteError}</Note>}
+      {canReply &&
+        (replying ? (
+          <Composer onSave={(body) => onReply(thread.id, body)} onCancel={() => setReplying(false)} ariaLabel={`Reply on ${label}`} />
+        ) : (
+          <Button variant="ghost" onClick={() => setReplying(true)} aria-label={`Reply on ${label}`}>
+            Reply
+          </Button>
+        ))}
     </div>
   )
 }

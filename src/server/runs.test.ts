@@ -210,6 +210,57 @@ describe("createRunner reconciliation", () => {
   });
 });
 
+describe("createRunner follow-ups", () => {
+  it("includes a prior run's reply in the prompt when a follow-up is sent to a different agent/model", async () => {
+    const followUpThread: Thread = {
+      id: "t1",
+      anchor: { path: "src/a.ts", side: "new", startLine: 1, endLine: 1 },
+      messages: [
+        { id: "m1", author: "reviewer", body: "Why this approach?", createdAt: "d", state: "sent" },
+        { id: "m2", author: "agent", body: "Because it avoids an N+1.", createdAt: "d", agent: "claude", model: "haiku", runId: "r0", read: true },
+        { id: "m3", author: "reviewer", body: "Does this scale though?", createdAt: "d", state: "draft" },
+      ],
+      resolved: false,
+      createdAt: "d",
+    };
+    const priorRun: Run = {
+      id: "r0",
+      agent: "claude",
+      model: "haiku",
+      state: "done",
+      threadIds: ["t1"],
+      startedAt: "d",
+      endedAt: "d",
+      summary: "Looks fine.",
+      error: null,
+      owner: null,
+    };
+    const store = makeStore(makeReview([followUpThread], [priorRun]));
+    const prompts: string[] = [];
+    const ask: AskFn = async (options) => {
+      prompts.push(options.prompt);
+      return { summary: "ok", replies: [{ threadId: "t1", body: "Yes, it scales." }], unanswered: [] };
+    };
+    const { runner, waitFor } = makeRunner({
+      store,
+      ask,
+      agents: async () => [{ id: "codex", name: "Codex", state: "ready", fix: null }],
+      listModels: async () => [{ id: "gpt-5.6-luna", label: "gpt-5.6-luna" }],
+    });
+
+    const sent = await runner.send(target, "codex", "gpt-5.6-luna");
+    expect(sent.runs.at(-1)).toMatchObject({ agent: "codex", model: "gpt-5.6-luna", threadIds: ["t1"] });
+    await waitFor(2);
+
+    expect(prompts[0]).toContain("Agent (claude · haiku): Because it avoids an N+1.");
+    expect(prompts[0]).toContain("Reviewer: Does this scale though?");
+
+    const review = store.current();
+    const thread = review.threads[0];
+    expect(thread.messages.at(-1)).toMatchObject({ author: "agent", agent: "codex", model: "gpt-5.6-luna", body: "Yes, it scales." });
+  });
+});
+
 describe("createRunner background run", () => {
   it("appends a reply to the right thread only, and leaves the rest unanswered", async () => {
     const store = makeStore(makeReview([draftThread("t1"), draftThread("t2")]));

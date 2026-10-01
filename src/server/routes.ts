@@ -39,6 +39,7 @@ export type RouteDeps = {
   createThread: (target: ReviewTarget, anchor: ThreadAnchor, body: string) => Promise<Review>;
   editDraft: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
   deleteDraft: (target: ReviewTarget, id: string) => Promise<Review>;
+  addFollowUp: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
   send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
@@ -210,6 +211,7 @@ export function createRoutes({
   createThread,
   editDraft,
   deleteDraft,
+  addFollowUp,
   detectAgents,
   listModels,
   send,
@@ -320,6 +322,14 @@ export function createRoutes({
       const { target } = c.req.valid("json");
       try {
         return c.json(await deleteDraft(target, c.req.param("id")), 200);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
+      }
+    })
+    .post("/api/review/threads/:id/messages", editBody, async (c) => {
+      const { target, body } = c.req.valid("json");
+      try {
+        return c.json(await addFollowUp(target, c.req.param("id"), body), 200);
       } catch (err) {
         return c.json(...reviewFailure(err));
       }

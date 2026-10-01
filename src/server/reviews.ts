@@ -119,6 +119,28 @@ export function deleteDraft(review: Review, id: string): Review {
   };
 }
 
+export function addFollowUp(review: Review, threadId: string, body: string): Review {
+  const index = review.threads.findIndex((thread) => thread.id === threadId);
+  if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);
+  const thread = review.threads[index];
+  if (thread.resolved) throw new ReviewError(409, "This thread is resolved.");
+  const last = thread.messages[thread.messages.length - 1];
+  if (!last || last.author !== "agent") {
+    const reason = last?.author === "reviewer" && last.state === "draft" ? "This thread already has a pending draft." : "This thread is waiting for a reply.";
+    throw new ReviewError(409, reason);
+  }
+  const message = {
+    id: crypto.randomUUID(),
+    author: "reviewer" as const,
+    body,
+    createdAt: new Date().toISOString(),
+    state: "draft" as const,
+  };
+  const threads = review.threads.slice();
+  threads[index] = { ...thread, messages: [...thread.messages, message] };
+  return { ...review, threads };
+}
+
 export function markThreadRead(review: Review, threadId: string): Review {
   const index = review.threads.findIndex((thread) => thread.id === threadId);
   if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);

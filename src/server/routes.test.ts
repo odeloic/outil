@@ -21,6 +21,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     createThread: unstubbed,
     editDraft: unstubbed,
     deleteDraft: unstubbed,
+    addFollowUp: unstubbed,
     detectAgents: unstubbed,
     listModels: unstubbed,
     send: unstubbed,
@@ -511,6 +512,71 @@ describe("DELETE /api/review/messages/:id", () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/review/threads/:id/messages", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("appends a follow-up draft to the thread and returns the updated review", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      addFollowUp: async (t, id, body) => {
+        calls.push([t, id, body]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "  as in my other comment…  " }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "t1", "as in my other comment…"]]);
+  });
+
+  it("returns 404 for an unknown thread id", async () => {
+    const app = makeApp({
+      addFollowUp: async () => {
+        throw new ReviewError(404, "No thread with id t1.");
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "x" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 when the thread is not waiting on the reviewer", async () => {
+    const app = makeApp({
+      addFollowUp: async () => {
+        throw new ReviewError(409, "This thread already has a pending draft.");
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, body: "x" }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects an empty or missing body", async () => {
+    const app = makeApp({});
+
+    for (const json of [{ target }, { target, body: "" }, { target, body: "   " }]) {
+      const res = await app.request("/api/review/threads/t1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      expect(res.status).toBe(400);
+    }
   });
 });
 

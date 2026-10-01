@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReviewTarget } from "../shared/api.ts";
 import { assertCommits, compareCommits, getCommit } from "./git.ts";
 import { createFileStore } from "./reviewFiles.ts";
-import { createTargetResolver, createThread, type ResolveTarget } from "./reviews.ts";
+import { addFollowUp, createTargetResolver, createThread, type ResolveTarget } from "./reviews.ts";
 
 const dirs: string[] = [];
 
@@ -52,6 +52,50 @@ describe("createFileStore", () => {
     const reloaded = await store2.get(target);
     expect(reloaded.threads).toHaveLength(1);
     expect(reloaded.threads[0].messages[0]).toMatchObject({ body: "looks off", state: "draft" });
+  });
+
+  it("supports a follow-up after a restart (a new store instance reading the persisted file)", async () => {
+    const { dir, commit } = makeRepo();
+    const sha = commit("one");
+    const target: ReviewTarget = { kind: "commit", sha };
+
+    const store1 = createFileStore(dir, resolverFor(dir));
+    await store1.update(target, (review) => {
+      const withThread = createThread(review, anchor, "please check");
+      const threadId = withThread.threads[0].id;
+      return {
+        ...withThread,
+        threads: withThread.threads.map((t) =>
+          t.id !== threadId
+            ? t
+            : {
+                ...t,
+                messages: [
+                  { ...t.messages[0], state: "sent" as const },
+                  {
+                    id: "agent-1",
+                    author: "agent" as const,
+                    body: "fixed",
+                    createdAt: new Date().toISOString(),
+                    agent: "claude" as const,
+                    model: "haiku",
+                    runId: "r1",
+                    read: true,
+                  },
+                ],
+              },
+        ),
+      };
+    });
+
+    const store2 = createFileStore(dir, resolverFor(dir));
+    const followedUp = await store2.update(target, (review) => addFollowUp(review, "t1", "one more thing"));
+    expect(followedUp.threads[0].messages).toHaveLength(3);
+    expect(followedUp.threads[0].messages.at(-1)).toMatchObject({ author: "reviewer", body: "one more thing", state: "draft" });
+
+    const store3 = createFileStore(dir, resolverFor(dir));
+    const reloaded = await store3.get(target);
+    expect(reloaded.threads[0].messages.at(-1)).toMatchObject({ author: "reviewer", body: "one more thing", state: "draft" });
   });
 
   it("round-trips a draft, a sent message, an agent message, and resolved state", async () => {

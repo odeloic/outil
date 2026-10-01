@@ -25,6 +25,7 @@ export type UseReview = {
   createThread: (anchor: ThreadAnchor, body: string) => Promise<Review>
   editDraft: (id: string, body: string) => Promise<Review>
   deleteDraft: (id: string) => Promise<Review>
+  addFollowUp: (threadId: string, body: string) => Promise<Review>
   send: (agent: AgentId, model: string) => Promise<Review>
   cancel: (runId: string) => Promise<Review>
   markRead: (threadId: string) => Promise<Review>
@@ -190,6 +191,14 @@ export function useReview(target: ReviewTarget): UseReview {
     [applyMutation],
   )
 
+  const addFollowUp = useCallback(
+    (threadId: string, body: string) =>
+      applyMutation(
+        unwrap(client.api.review.threads[':id'].messages.$post({ param: { id: threadId }, json: { target: targetRef.current, body } })),
+      ),
+    [applyMutation],
+  )
+
   const send = useCallback(
     (agent: AgentId, model: string) =>
       applyMutation(unwrap(client.api.review.send.$post({ json: { target: targetRef.current, agent, model } }))),
@@ -217,6 +226,7 @@ export function useReview(target: ReviewTarget): UseReview {
     createThread,
     editDraft,
     deleteDraft,
+    addFollowUp,
     send,
     cancel,
     markRead,

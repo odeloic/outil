@@ -97,6 +97,41 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("Agent (claude · haiku): Because X.");
   });
 
+  it("includes a follow-up thread's full history and other threads for context when a different agent/model runs next", () => {
+    const followUpThread = thread({
+      id: "t1",
+      messages: [
+        { id: "m1", author: "reviewer", body: "Why this approach?", createdAt: "d", state: "sent" },
+        { id: "m2", author: "agent", body: "Because it avoids an N+1.", createdAt: "d", agent: "claude", model: "haiku", runId: "r1", read: true },
+        { id: "m3", author: "reviewer", body: "As in my other comment, does this scale?", createdAt: "d", state: "sent" },
+      ],
+    });
+    const otherThread = thread({
+      id: "t2",
+      anchor: { path: "src/b.ts", side: "new", startLine: 20, endLine: 20 },
+      messages: [
+        { id: "m4", author: "reviewer", body: "What about here?", createdAt: "d", state: "sent" },
+        { id: "m5", author: "agent", body: "Same pattern as src/a.ts.", createdAt: "d", agent: "claude", model: "haiku", runId: "r1", read: true },
+      ],
+    });
+    const r = review({
+      threads: [followUpThread, otherThread],
+      runs: [runningRun({ agent: "codex", model: "gpt-5.6-luna", threadIds: ["t1"] })],
+    });
+
+    const prompt = buildPrompt(r, emptyContext);
+    const sections = prompt.split("\n\n");
+    const t1Section = sections.find((s) => s.startsWith("Thread t1"))!;
+    const t2Section = sections.find((s) => s.startsWith("Thread t2"))!;
+
+    expect(t1Section).toContain("Reviewer: Why this approach?");
+    expect(t1Section).toContain("Agent (claude · haiku): Because it avoids an N+1.");
+    expect(t1Section).toContain("Reviewer: As in my other comment, does this scale?");
+    expect(t1Section.endsWith("Needs a reply.")).toBe(true);
+    expect(t2Section).toContain("Agent (claude · haiku): Same pattern as src/a.ts.");
+    expect(t2Section.endsWith("Needs a reply.")).toBe(false);
+  });
+
   it("marks the anchored lines with a leading '>' in the snippet", () => {
     const context: PromptContext = {
       headSubject: "x",

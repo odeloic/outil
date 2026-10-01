@@ -29,6 +29,7 @@ export type ThreadHandlers = {
   onCancelEdit: (anchor: ThreadAnchor) => void
   onSaveEdit: (id: string, body: string, anchor: ThreadAnchor) => Promise<unknown>
   onDelete: (id: string, anchor: ThreadAnchor) => Promise<unknown>
+  onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
 }
 
@@ -308,6 +309,7 @@ function ExtrasAtRow({ index, comments, pane = null }: { index: number; comments
               onCancelEdit={threadHandlers.onCancelEdit}
               onSaveEdit={threadHandlers.onSaveEdit}
               onDelete={threadHandlers.onDelete}
+              onReply={threadHandlers.onReply}
               onMarkRead={threadHandlers.onMarkRead}
             />
           ) : (

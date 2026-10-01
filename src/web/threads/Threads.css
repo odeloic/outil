@@ -46,6 +46,12 @@
   align-items: flex-start;
 }
 
+.thread-card__message--draft {
+  border: 1px dashed var(--ods-draft-line);
+  border-radius: var(--ods-radius-md);
+  padding: var(--ods-space-4) var(--ods-space-5);
+}
+
 .thread-card__body-wrap {
   flex: 1;
   min-width: 0;

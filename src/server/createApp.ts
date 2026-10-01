@@ -7,7 +7,7 @@ import { getFileDiff } from "./diff.ts";
 import { publishActivity, publishingStore, subscribe } from "./events.ts";
 import { assertCommits, compareCommits, getCommit, getRepoInfo, listChanges, listCommits, resolveCommit } from "./git.ts";
 import { createRoutes } from "./routes.ts";
-import { assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft, markThreadRead } from "./reviews.ts";
+import { addFollowUp, assertAnchorInDiff, createTargetResolver, createThread, deleteDraft, editDraft, markThreadRead } from "./reviews.ts";
 import { createFileStore } from "./reviewFiles.ts";
 import { createRunner, type Runner } from "./runs.ts";
 
@@ -59,6 +59,7 @@ export function createApp(cwd: string) {
       }),
     editDraft: (target, id, body) => store.update(target, (review) => editDraft(review, id, body)),
     deleteDraft: (target, id) => store.update(target, (review) => deleteDraft(review, id)),
+    addFollowUp: (target, id, body) => store.update(target, (review) => addFollowUp(review, id, body)),
     detectAgents: (refresh) => agentCache.list(refresh),
     listModels: (agent) => listModels(agent),
     send: (target, agent, model) => runner.send(target, agent, model),

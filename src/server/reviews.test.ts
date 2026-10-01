@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Review, ReviewTarget } from "../shared/api.ts";
 import {
+  addFollowUp,
   assertAnchorInDiff,
   createTargetResolver,
   createThread,
@@ -166,6 +167,92 @@ describe("markThreadRead", () => {
     } catch (err) {
       expect((err as ReviewError).status).toBe(404);
     }
+  });
+});
+
+describe("addFollowUp", () => {
+  function withAgentReply(review: Review, threadId: string): Review {
+    return {
+      ...review,
+      threads: review.threads.map((t) =>
+        t.id !== threadId
+          ? t
+          : {
+              ...t,
+              messages: [
+                ...t.messages,
+                { id: "a1", author: "agent" as const, body: "Here's why.", createdAt: "d", agent: "claude" as const, model: "haiku", runId: "r1", read: true },
+              ],
+            },
+      ),
+    };
+  }
+
+  it("appends a reviewer draft message after the agent's last reply", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = withAgentReply(review, "t1");
+
+    const followedUp = addFollowUp(review, "t1", "thanks, one more thing");
+    const messages = followedUp.threads[0].messages;
+    expect(messages).toHaveLength(3);
+    expect(messages[2]).toMatchObject({ author: "reviewer", body: "thanks, one more thing", state: "draft" });
+  });
+
+  it("throws a 404 ReviewError for an unknown thread id", () => {
+    expect(() => addFollowUp(emptyReview(), "nope", "x")).toThrow(ReviewError);
+    try {
+      addFollowUp(emptyReview(), "nope", "x");
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(404);
+    }
+  });
+
+  it("throws a 409 ReviewError when the thread is resolved", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = withAgentReply(review, "t1");
+    review = { ...review, threads: review.threads.map((t) => ({ ...t, resolved: true })) };
+
+    expect(() => addFollowUp(review, "t1", "x")).toThrow(ReviewError);
+    try {
+      addFollowUp(review, "t1", "x");
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(409);
+    }
+  });
+
+  it("throws a 409 ReviewError when the thread already has a pending draft", () => {
+    const review = createThread(emptyReview(), anchor, "one");
+
+    expect(() => addFollowUp(review, "t1", "x")).toThrow(ReviewError);
+    try {
+      addFollowUp(review, "t1", "x");
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(409);
+    }
+  });
+
+  it("throws a 409 ReviewError when the thread is waiting for a reply", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = {
+      ...review,
+      threads: review.threads.map((t) => ({ ...t, messages: t.messages.map((m) => ({ ...m, state: "sent" as const })) })),
+    };
+
+    expect(() => addFollowUp(review, "t1", "x")).toThrow(ReviewError);
+    try {
+      addFollowUp(review, "t1", "x");
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(409);
+    }
+  });
+
+  it("does not mutate the original review", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = withAgentReply(review, "t1");
+    const before = JSON.stringify(review);
+
+    addFollowUp(review, "t1", "more");
+    expect(JSON.stringify(review)).toBe(before);
   });
 });
 

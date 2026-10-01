@@ -158,7 +158,7 @@ export function Review({
   const collapsedOverrides = overrides.key === reviewKey ? overrides.map : new Map<string, boolean>()
   const [railTab, setRailTab] = useState<RailTab>('files')
   const current = useCurrentFile(changes.files.length)
-  const { review, error, reviewer, createThread, editDraft, deleteDraft, send, cancel, markRead } = useReview(reviewTarget)
+  const { review, error, reviewer, createThread, editDraft, deleteDraft, addFollowUp, send, cancel, markRead } = useReview(reviewTarget)
   const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
   const threadsByPath = useMemo(() => {
     const map = new Map<string, Thread[]>()
@@ -256,6 +256,7 @@ export function Review({
                 onCreateThread={createThread}
                 onEditDraft={editDraft}
                 onDeleteDraft={deleteDraft}
+                onReply={addFollowUp}
                 onMarkRead={markRead}
               />
             )

@@ -1,8 +1,9 @@
-import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { AgentModel, AgentStatus } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
 import { Avatar, Button, MenuOption, Note, Popover, Spinner, Tag } from '../design-system'
+import { renderFix } from './fixText.tsx'
 import { useAgentChoice } from './useAgentChoice.ts'
 import './AgentPanel.css'
 
@@ -10,10 +11,6 @@ const STATE_LABEL: Record<AgentStatus['state'], string> = {
   ready: 'Ready',
   'signed-out': 'Not signed in',
   'not-installed': 'Not installed',
-}
-
-function renderFix(fix: string): ReactNode {
-  return fix.split('`').map((part, index) => (index % 2 === 1 ? <code key={index}>{part}</code> : part))
 }
 
 function moveBetweenOptions(event: ReactKeyboardEvent<HTMLUListElement>) {

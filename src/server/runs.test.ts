@@ -329,6 +329,54 @@ describe("createRunner background run", () => {
     }
   });
 
+  it("marks an invalid answer as failed with a composed message, and writes no agent message", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const ask: AskFn = async () => {
+      throw new AgentRunError("invalid", "The agent's answer was not a JSON object.");
+    };
+    const { runner, waitFor } = makeRunner({ store, ask });
+
+    await runner.send(target, "claude", "haiku");
+    await waitFor(2);
+
+    const review = store.current();
+    const run = review.runs[0];
+    expect(run.state).toBe("failed");
+    expect(run.error).toBe("The agent's answer was not in the expected format. The agent's answer was not a JSON object.");
+    expect(review.threads[0].messages).toHaveLength(1);
+    expect(review.threads.flatMap((t) => t.messages).some((m) => m.author === "agent")).toBe(false);
+  });
+
+  it("lets the same thread be sent again after the run fails", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const ask: AskFn = async () => {
+      throw new AgentRunError("failed", "boom");
+    };
+    const { runner, waitFor } = makeRunner({ store, ask });
+
+    const first = await runner.send(target, "claude", "haiku");
+    await waitFor(2);
+    expect(store.current().runs[0].state).toBe("failed");
+
+    const retried = await runner.send(target, "claude", "haiku");
+    expect(retried.runs.at(-1)).toMatchObject({ state: "running", threadIds: first.runs[0].threadIds });
+  });
+
+  it("lets the same thread be sent again after the run times out", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const ask: AskFn = async () => {
+      throw new AgentRunError("timeout", "The agent did not answer within 10 minutes and was stopped.");
+    };
+    const { runner, waitFor } = makeRunner({ store, ask });
+
+    const first = await runner.send(target, "claude", "haiku");
+    await waitFor(2);
+    expect(store.current().runs[0].state).toBe("timed-out");
+
+    const retried = await runner.send(target, "claude", "haiku");
+    expect(retried.runs.at(-1)).toMatchObject({ state: "running", threadIds: first.runs[0].threadIds });
+  });
+
   it("calls onChange after the send update and again after the run finishes", async () => {
     const store = makeStore(makeReview([draftThread("t1")]));
     const { runner, calls, waitFor } = makeRunner({ store });

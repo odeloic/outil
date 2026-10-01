@@ -2,6 +2,7 @@ import type { AgentId, AgentModel, AgentStatus } from "../../shared/api.ts";
 
 export type AgentCache = {
   list(refresh?: boolean): Promise<AgentStatus[]>;
+  invalidate(): void;
 };
 
 export function createAgentCache(detect: () => Promise<AgentStatus[]>): AgentCache {
@@ -16,6 +17,9 @@ export function createAgentCache(detect: () => Promise<AgentStatus[]>): AgentCac
         });
       }
       return cached;
+    },
+    invalidate() {
+      cached = null;
     },
   };
 }

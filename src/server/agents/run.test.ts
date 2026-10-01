@@ -157,14 +157,14 @@ describe("runAgent — claude", () => {
     ).rejects.toMatchObject({ kind: "failed", message: "line one\nline two\nline three" });
   });
 
-  it("times out when the agent never answers", async () => {
+  it("times out when the agent never answers, with a message naming the limit and that it was stopped", async () => {
     const bin = await scratchDir();
     const work = await scratchDir();
     await fakeCli(bin, "claude", `sleep 30`);
 
     await expect(
       runAgent({ agent: "claude", model: "haiku", cwd: work, prompt: "hello", env: fakeEnv(bin), timeoutMs: 300 }),
-    ).rejects.toMatchObject({ kind: "timeout" });
+    ).rejects.toMatchObject({ kind: "timeout", message: expect.stringContaining("and was stopped.") });
   });
 
   it("rejects an unsafe model id before spawning anything", async () => {

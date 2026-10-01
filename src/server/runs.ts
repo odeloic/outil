@@ -92,7 +92,13 @@ function applyOutcome(review: Review, runId: string, outcome: Outcome, cancelMes
 
   const state = stateForError(outcome.err);
   const message =
-    state === "cancelled" && cancelMessage ? cancelMessage : outcome.err instanceof Error ? outcome.err.message : String(outcome.err);
+    state === "cancelled" && cancelMessage
+      ? cancelMessage
+      : outcome.err instanceof AgentRunError && outcome.err.kind === "invalid"
+        ? `The agent's answer was not in the expected format. ${outcome.err.message}`
+        : outcome.err instanceof Error
+          ? outcome.err.message
+          : String(outcome.err);
   const runs = review.runs.map((candidate) => (candidate.id === runId ? { ...candidate, state, error: message, endedAt: now } : candidate));
   return { ...review, runs };
 }
@@ -193,8 +199,9 @@ export function createRunner({
   return {
     async send(target, agent, model) {
       const statuses = await agents();
-      if (statuses.find((status) => status.id === agent)?.state !== "ready") {
-        throw new ReviewError(409, `${AGENT_NAMES[agent]} is not ready to run. Check the Agents panel.`);
+      const status = statuses.find((candidate) => candidate.id === agent);
+      if (status?.state !== "ready") {
+        throw new ReviewError(409, `${AGENT_NAMES[agent]} is not ready to run. Check the Agents panel.`, status?.fix ?? null);
       }
       const models = await listModels(agent);
       if (!models.some((candidate) => candidate.id === model)) {

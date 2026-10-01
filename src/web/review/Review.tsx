@@ -4,9 +4,11 @@ import { AGENT_NAMES } from '../../shared/agents.ts'
 import { draftCount, openThreadCount, threadStatus } from '../../shared/review.ts'
 import { AgentPanel } from '../agents/AgentPanel.tsx'
 import { useAgentChoice } from '../agents/useAgentChoice.ts'
+import { renderFix } from '../agents/fixText.tsx'
 import { useModelLabel } from '../agents/useAgentModels.ts'
+import { ApiRequestError } from '../api.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Avatar, Button, CountBadge, Kbd, Note, Tabs } from '../design-system'
+import { Avatar, Button, CountBadge, Kbd, Note, Tabs, type NoteVariant } from '../design-system'
 import { relativeTime } from '../format.ts'
 import { initials } from '../threads/initials.ts'
 import { MessageBody } from '../threads/MessageBody.tsx'
@@ -24,12 +26,26 @@ type RailTab = 'files' | 'history'
 
 const NO_THREADS: Thread[] = []
 const NO_RUNS: Run[] = []
-const FAILURE_STATES = new Set<Run['state']>(['failed', 'timed-out', 'interrupted'])
+const END_NOTE_STATES = new Set<Run['state']>(['cancelled', 'failed', 'timed-out', 'interrupted'])
+const RETRY_TITLE = 'Sends the threads still waiting for a reply, plus any drafts written since, to the current agent and model.'
 
 function sendLabel(drafts: number): string {
   if (drafts === 0) return 'Send drafts'
   if (drafts === 1) return 'Send 1 draft'
   return `Send ${drafts} drafts`
+}
+
+function endNote(run: Run): { variant: NoteVariant; message: string; actionLabel: string } {
+  switch (run.state) {
+    case 'cancelled':
+      return { variant: 'default', message: 'Run cancelled. Your comments are kept.', actionLabel: 'Send again' }
+    case 'failed':
+      return { variant: 'failure', message: `The agent failed: ${run.error ?? 'Unknown error.'}`, actionLabel: 'Retry' }
+    case 'timed-out':
+      return { variant: 'failure', message: run.error ?? 'The agent did not answer in time and was stopped.', actionLabel: 'Retry' }
+    default:
+      return { variant: 'failure', message: `Interrupted: ${run.error ?? 'Outil stopped before the agent answered.'}`, actionLabel: 'Retry' }
+  }
 }
 
 function SendPanel({
@@ -45,9 +61,10 @@ function SendPanel({
   send: (agent: AgentId, model: string) => Promise<ReviewData>
   cancel: (runId: string) => Promise<ReviewData>
 }) {
-  const { agent, model, modelsLoading, modelsError } = useAgentChoice()
+  const { agent, agents, model, agentsLoading, recheckAgents, modelsLoading, modelsError } = useAgentChoice()
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [sendErrorFix, setSendErrorFix] = useState<string | null>(null)
   const runningRun = runs.find((run) => run.state === 'running') ?? null
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
   const latestRunModelLabel = useModelLabel(latestRun?.agent ?? null, latestRun?.model ?? null)
@@ -71,13 +88,26 @@ function SendPanel({
     if (!agent || !model) return
     setSending(true)
     setSendError(null)
+    setSendErrorFix(null)
     send(agent, model)
-      .catch((err: Error) => setSendError(err.message))
+      .catch((err: unknown) => {
+        setSendError(err instanceof Error ? err.message : String(err))
+        setSendErrorFix(err instanceof ApiRequestError ? err.fix : null)
+      })
       .finally(() => setSending(false))
   }
 
-  const endNoteShown = latestRun?.state === 'cancelled'
-  const shownReason = endNoteShown && drafts === 0 ? null : reason
+  const latestRunId = latestRun?.id ?? null
+  const latestRunState = latestRun?.state ?? null
+  useEffect(() => {
+    if (latestRunId && latestRunState === 'failed') recheckAgents()
+  }, [latestRunId, latestRunState, recheckAgents])
+
+  const latestAgentStatus = latestRun ? agents.find((candidate) => candidate.id === latestRun.agent) : undefined
+  const latestAgentFix = latestAgentStatus && latestAgentStatus.state !== 'ready' ? latestAgentStatus.fix : null
+
+  const latestEndNote = latestRun && END_NOTE_STATES.has(latestRun.state) ? endNote(latestRun) : null
+  const shownReason = latestEndNote && drafts === 0 ? null : reason
   const describedBy = runningRun ? 'review-run-progress' : shownReason ? 'review-send-reason' : undefined
 
   return (
@@ -99,7 +129,19 @@ function SendPanel({
           Also re-sends {noReplyCount} {noReplyCount === 1 ? 'thread' : 'threads'} with no reply.
         </p>
       )}
-      {sendError && <Note variant="failure">{sendError}</Note>}
+      {sendError && (
+        <Note
+          variant="failure"
+          action={
+            <Button variant="default" onClick={recheckAgents} disabled={agentsLoading}>
+              {agentsLoading ? 'Checking…' : 'Check again'}
+            </Button>
+          }
+        >
+          {sendError}
+          {sendErrorFix && <span> {renderFix(sendErrorFix)}</span>}
+        </Note>
+      )}
       {latestRun?.state === 'done' && (
         <div className="review__run-summary">
           <Avatar kind="agent" />
@@ -116,17 +158,18 @@ function SendPanel({
           </div>
         </div>
       )}
-      {endNoteShown && (
+      {latestEndNote && (
         <RunEndNote
-          variant="default"
-          message="Run cancelled. Your comments are kept."
-          actionLabel="Send again"
+          variant={latestEndNote.variant}
+          message={latestEndNote.message}
+          fix={latestEndNote.variant === 'failure' ? latestAgentFix : null}
+          actionLabel={latestEndNote.actionLabel}
+          actionTitle={RETRY_TITLE}
           onAction={handleSend}
           pending={sending}
           disabled={!agent || !model}
         />
       )}
-      {latestRun && FAILURE_STATES.has(latestRun.state) && <Note variant="failure">{latestRun.error ?? 'The run did not finish.'}</Note>}
     </div>
   )
 }

@@ -48,6 +48,19 @@ describe("createAgentCache", () => {
     expect(calls).toBe(1);
   });
 
+  it("invalidate clears the cache so the next call rechecks", async () => {
+    let calls = 0;
+    const cache = createAgentCache(async () => {
+      calls++;
+      return agents;
+    });
+
+    await cache.list();
+    cache.invalidate();
+    await cache.list();
+    expect(calls).toBe(2);
+  });
+
   it("does not cache a failed detection, so the next call retries", async () => {
     let calls = 0;
     const cache = createAgentCache(async () => {

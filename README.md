@@ -58,6 +58,10 @@ reload, once it has finished and been persisted.
   themselves ignore user config (`--ignore-user-config`), so a model from a custom provider
   in your config may be listed but not actually run.
 
+An agent run that does not answer within 10 minutes is stopped and reported as timed out.
+Set `OUTIL_AGENT_TIMEOUT_MS` (a positive number of milliseconds) to change that limit; an
+invalid or missing value keeps the default.
+
 ## Develop
 
 ```sh

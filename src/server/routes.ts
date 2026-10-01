@@ -55,7 +55,7 @@ function toApiError(err: unknown): ApiError {
 }
 
 function reviewFailure(err: unknown): readonly [ApiError, 400 | 404 | 409 | 500] {
-  if (err instanceof ReviewError) return [{ error: err.message }, err.status];
+  if (err instanceof ReviewError) return [{ error: err.message, ...(err.fix ? { fix: err.fix } : {}) }, err.status];
   return refFailure(err);
 }
 

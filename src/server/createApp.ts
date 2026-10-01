@@ -1,6 +1,7 @@
 import { askAgent } from "./agents/ask.ts";
 import { createAgentCache, createModelsCache } from "./agents/cache.ts";
 import { detectAgents } from "./agents/detect.ts";
+import { AgentRunError } from "./agents/errors.ts";
 import { listModels } from "./agents/models.ts";
 import { promptContext } from "./agents/prompt.ts";
 import { getFileDiff } from "./diff.ts";
@@ -26,6 +27,19 @@ export function stopAllRunners(): Promise<void> {
   return Promise.all([...runners].map((runner) => runner.stopAll())).then(() => undefined);
 }
 
+export function parseAgentTimeoutMs(env: NodeJS.ProcessEnv): number | undefined {
+  const raw = env.OUTIL_AGENT_TIMEOUT_MS;
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+const NOT_INSTALLED_PATTERN = /is not installed/;
+
+export function isAgentMissingError(err: unknown): boolean {
+  return err instanceof AgentRunError && err.kind === "failed" && NOT_INSTALLED_PATTERN.test(err.message);
+}
+
 export function createApp(cwd: string) {
   const boundListChanges = (base: string | null, head: string) => listChanges(cwd, base, head);
   const boundGetCommit = (sha: string) => getCommit(cwd, sha);
@@ -43,10 +57,18 @@ export function createApp(cwd: string) {
   const modelsCache = createModelsCache((agent) => listModels(agent));
   const runner = createRunner({
     store,
-    ask: (options) => askAgent({ repoRoot: cwd, ...options }),
+    ask: async (options) => {
+      try {
+        return await askAgent({ repoRoot: cwd, ...options });
+      } catch (err) {
+        if (isAgentMissingError(err)) agentCache.invalidate();
+        throw err;
+      }
+    },
     agents: () => agentCache.list(),
     listModels: (agent) => modelsCache.list(agent),
     context: (review) => promptContext(cwd, review, boundGetCommit, boundListChanges),
+    timeoutMs: parseAgentTimeoutMs(process.env),
     onChange: () => {},
     onActivity: (key, runId, text) => publishActivity(key, { runId, text, at: new Date().toISOString() }),
   });

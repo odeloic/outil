@@ -97,6 +97,7 @@ export type RefErrorCode = "empty-repo" | "unknown" | "ambiguous" | "not-a-commi
 export type ApiError = {
   error: string
   code?: RefErrorCode
+  fix?: string | null
 }
 
 export type AgentId = "claude" | "codex"

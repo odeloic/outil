@@ -758,6 +758,40 @@ describe("POST /api/review/send", () => {
     expect(res.status).toBe(409);
   });
 
+  it("includes the agent's fix text in a 409 for a not-ready agent", async () => {
+    const app = makeApp({
+      send: async () => {
+        throw new ReviewError(409, "Claude Code is not ready to run. Check the Agents panel.", "Run `claude auth login`.");
+      },
+    });
+
+    const res = await app.request("/api/review/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, agent: "claude", model: "haiku" }),
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Claude Code is not ready to run. Check the Agents panel.",
+      fix: "Run `claude auth login`.",
+    });
+  });
+
+  it("omits fix when a 409 ReviewError carries none", async () => {
+    const app = makeApp({
+      send: async () => {
+        throw new ReviewError(409, "A run is already in progress for this review.");
+      },
+    });
+
+    const res = await app.request("/api/review/send", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, agent: "claude", model: "haiku" }),
+    });
+    expect(await res.json()).toEqual({ error: "A run is already in progress for this review." });
+  });
+
   it("maps a 400 ReviewError (nothing to send) through", async () => {
     const app = makeApp({
       send: async () => {

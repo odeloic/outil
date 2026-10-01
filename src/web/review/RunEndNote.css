@@ -1,0 +1,15 @@
+.run-end-note__body {
+  display: inline;
+  overflow-wrap: anywhere;
+}
+
+.run-end-note__toggle {
+  display: inline-flex;
+  margin-left: var(--ods-space-2);
+  padding: 0;
+  height: auto;
+}
+
+.run-end-note__fix {
+  color: var(--ods-fg-2);
+}

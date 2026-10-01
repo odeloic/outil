@@ -118,7 +118,7 @@ function runProcess(
     if (opts.timeoutMs !== undefined) {
       timeoutTimer = setTimeout(() => {
         if (settled || pendingRejection) return;
-        pendingRejection = new AgentRunError("timeout", `The agent did not answer within ${formatDuration(opts.timeoutMs!)}.`);
+        pendingRejection = new AgentRunError("timeout", `The agent did not answer within ${formatDuration(opts.timeoutMs!)} and was stopped.`);
         killGroup();
       }, opts.timeoutMs);
     }

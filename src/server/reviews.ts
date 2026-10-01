@@ -2,10 +2,12 @@ import type { ChangeSet, Comparison, CommitDetails, Review, ReviewTarget, Thread
 
 export class ReviewError extends Error {
   readonly status: 400 | 404 | 409;
+  readonly fix: string | null;
 
-  constructor(status: 400 | 404 | 409, message: string) {
+  constructor(status: 400 | 404 | 409, message: string, fix: string | null = null) {
     super(message);
     this.status = status;
+    this.fix = fix;
   }
 }
 

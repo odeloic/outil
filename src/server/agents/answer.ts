@@ -37,14 +37,14 @@ function isRawReply(value: unknown): value is AnswerReply {
 
 export function parseAnswer(raw: unknown, sentThreadIds: string[]): ParsedAnswer {
   if (typeof raw !== "object" || raw === null) {
-    throw new AgentRunError("invalid", "The agent's answer was not a JSON object.");
+    throw new AgentRunError("invalid", "not a JSON object");
   }
   const { summary, replies } = raw as Record<string, unknown>;
   if (typeof summary !== "string") {
-    throw new AgentRunError("invalid", "The agent's answer is missing a summary.");
+    throw new AgentRunError("invalid", "missing a summary");
   }
   if (!Array.isArray(replies) || !replies.every(isRawReply)) {
-    throw new AgentRunError("invalid", "The agent's answer has malformed replies.");
+    throw new AgentRunError("invalid", "malformed replies");
   }
 
   const sent = new Set(sentThreadIds);

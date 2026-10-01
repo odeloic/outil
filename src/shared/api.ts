@@ -159,6 +159,8 @@ export type RunOwner = {
   instance: string
 }
 
+export type RunErrorKind = "missing" | "agent" | "invalid"
+
 export type Run = {
   id: string
   agent: AgentId
@@ -169,6 +171,7 @@ export type Run = {
   endedAt: string | null
   summary: string | null
   error: string | null
+  errorKind?: RunErrorKind
   owner: RunOwner | null
 }
 

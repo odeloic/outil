@@ -73,6 +73,8 @@ function isThread(value: unknown): value is Thread {
   );
 }
 
+const RUN_ERROR_KINDS = new Set<string>(["missing", "agent", "invalid"]);
+
 function isRunOwner(value: unknown): value is Run["owner"] {
   if (value === null || value === undefined) return true;
   if (typeof value !== "object") return false;
@@ -92,6 +94,13 @@ function isRun(value: unknown): value is Run {
     run.threadIds.every((id) => typeof id === "string") &&
     isRunOwner(run.owner)
   );
+}
+
+function withKnownErrorKind(run: Run): Run {
+  if (run.errorKind === undefined || RUN_ERROR_KINDS.has(run.errorKind)) return run;
+  const known = { ...run };
+  delete known.errorKind;
+  return known;
 }
 
 type FileStat = { mtimeMs: number; size: number; ino: number };
@@ -118,7 +127,7 @@ function normalize(resolution: TargetResolution, target: ReviewTarget, value: un
   if (!Array.isArray(raw.threads) || !raw.threads.every(isThread)) return null;
   const threads = raw.threads as Thread[];
   if (raw.runs !== undefined && (!Array.isArray(raw.runs) || !raw.runs.every(isRun))) return null;
-  const runs = Array.isArray(raw.runs) ? (raw.runs as Run[]) : [];
+  const runs = Array.isArray(raw.runs) ? (raw.runs as Run[]).map(withKnownErrorKind) : [];
   if (raw.generation !== undefined && typeof raw.generation !== "string") return null;
   const generation = typeof raw.generation === "string" ? raw.generation : crypto.randomUUID();
   const nextThread = typeof raw.nextThread === "number" ? raw.nextThread : maxThreadNumber(threads) + 1;

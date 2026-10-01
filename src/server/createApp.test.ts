@@ -19,13 +19,14 @@ describe("parseAgentTimeoutMs", () => {
 });
 
 describe("isAgentMissingError", () => {
-  it("is true for a failed AgentRunError reporting the agent is not installed", () => {
-    expect(isAgentMissingError(new AgentRunError("failed", "Claude Code is not installed."))).toBe(true);
-    expect(isAgentMissingError(new AgentRunError("failed", "Codex is not installed."))).toBe(true);
+  it("is true for a missing-binary AgentRunError", () => {
+    expect(isAgentMissingError(new AgentRunError("missing", "Claude Code is not installed."))).toBe(true);
+    expect(isAgentMissingError(new AgentRunError("missing", "Codex is not installed."))).toBe(true);
   });
 
   it("is false for other failures or error kinds", () => {
     expect(isAgentMissingError(new AgentRunError("failed", "The prompt was refused."))).toBe(false);
+    expect(isAgentMissingError(new AgentRunError("failed", "is not installed"))).toBe(false);
     expect(isAgentMissingError(new AgentRunError("timeout", "too slow"))).toBe(false);
     expect(isAgentMissingError(new Error("is not installed"))).toBe(false);
     expect(isAgentMissingError(null)).toBe(false);

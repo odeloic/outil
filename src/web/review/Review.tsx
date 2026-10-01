@@ -17,6 +17,7 @@ import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
 import { adjacentOpenThread, focusThread, jumpToFile, orderOpenThreads, resetNavigation, useCurrentFile } from './navigation.ts'
 import { RunEndNote } from './RunEndNote.tsx'
+import { followNotReadyWatch, type NotReadyWatch } from './sendError.ts'
 import { RunProgress } from './RunProgress.tsx'
 import { useReview } from './useReview.ts'
 import { useViewedFiles } from './viewed.ts'
@@ -40,7 +41,11 @@ function endNote(run: Run): { variant: NoteVariant; message: string; actionLabel
     case 'cancelled':
       return { variant: 'default', message: 'Run cancelled. Your comments are kept.', actionLabel: 'Send again' }
     case 'failed':
-      return { variant: 'failure', message: `The agent failed: ${run.error ?? 'Unknown error.'}`, actionLabel: 'Retry' }
+      return {
+        variant: 'failure',
+        message: run.errorKind === 'invalid' ? (run.error ?? 'Unknown error.') : `The agent failed: ${run.error ?? 'Unknown error.'}`,
+        actionLabel: 'Retry',
+      }
     case 'timed-out':
       return { variant: 'failure', message: run.error ?? 'The agent did not answer in time and was stopped.', actionLabel: 'Retry' }
     default:
@@ -61,10 +66,26 @@ function SendPanel({
   send: (agent: AgentId, model: string) => Promise<ReviewData>
   cancel: (runId: string) => Promise<ReviewData>
 }) {
-  const { agent, agents, model, agentsLoading, recheckAgents, modelsLoading, modelsError } = useAgentChoice()
+  const { agent, agents, model, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendErrorFix, setSendErrorFix] = useState<string | null>(null)
+  const [notReadyWatch, setNotReadyWatch] = useState<NotReadyWatch | null>(null)
+  const [seenChoice, setSeenChoice] = useState(stored)
+  if (seenChoice !== stored) {
+    setSeenChoice(stored)
+    setSendError(null)
+    setSendErrorFix(null)
+    setNotReadyWatch(null)
+  }
+  const followed = followNotReadyWatch(notReadyWatch, agents)
+  if (followed.clear) {
+    setSendError(null)
+    setSendErrorFix(null)
+    setNotReadyWatch(null)
+  } else if (followed.watch !== notReadyWatch) {
+    setNotReadyWatch(followed.watch)
+  }
   const runningRun = runs.find((run) => run.state === 'running') ?? null
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
   const latestRunModelLabel = useModelLabel(latestRun?.agent ?? null, latestRun?.model ?? null)
@@ -89,19 +110,26 @@ function SendPanel({
     setSending(true)
     setSendError(null)
     setSendErrorFix(null)
+    setNotReadyWatch(null)
     send(agent, model)
       .catch((err: unknown) => {
         setSendError(err instanceof Error ? err.message : String(err))
-        setSendErrorFix(err instanceof ApiRequestError ? err.fix : null)
+        const notReady = err instanceof ApiRequestError && err.status === 409 && err.fix ? err.fix : null
+        setSendErrorFix(notReady)
+        if (notReady) {
+          setNotReadyWatch({ agent, sawNotReady: false })
+          recheckAgents()
+        }
       })
       .finally(() => setSending(false))
   }
 
   const latestRunId = latestRun?.id ?? null
   const latestRunState = latestRun?.state ?? null
+  const latestRunErrorKind = latestRun?.errorKind ?? null
   useEffect(() => {
-    if (latestRunId && latestRunState === 'failed') recheckAgents()
-  }, [latestRunId, latestRunState, recheckAgents])
+    if (latestRunId && latestRunState === 'failed' && (latestRunErrorKind === 'missing' || latestRunErrorKind === 'agent')) recheckAgents()
+  }, [latestRunId, latestRunState, latestRunErrorKind, recheckAgents])
 
   const latestAgentStatus = latestRun ? agents.find((candidate) => candidate.id === latestRun.agent) : undefined
   const latestAgentFix = latestAgentStatus && latestAgentStatus.state !== 'ready' ? latestAgentStatus.fix : null

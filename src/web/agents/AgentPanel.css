@@ -76,6 +76,12 @@
   font-size: var(--ods-text-xs);
 }
 
+.agent-panel__hint {
+  margin: 0;
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-2xs);
+}
+
 .agent-panel__models-loading {
   display: flex;
   align-items: center;

@@ -60,6 +60,17 @@ function stateForError(err: unknown): Exclude<RunState, "running" | "interrupted
   return "failed";
 }
 
+const AGENT_AVAILABILITY_PATTERN =
+  /\b(auth(entication)?|o?auth token|log ?in|api key|not signed in|unauthori[sz]ed|authori[sz]ation (failed|required|error)|token (expired|invalid))\b/i;
+
+function errorKindFor(err: unknown): Run["errorKind"] {
+  if (!(err instanceof AgentRunError)) return undefined;
+  if (err.kind === "missing") return "missing";
+  if (err.kind === "invalid") return "invalid";
+  if (err.kind === "failed" && AGENT_AVAILABILITY_PATTERN.test(err.message)) return "agent";
+  return undefined;
+}
+
 type Outcome = { kind: "done"; answer: ParsedAnswer } | { kind: "error"; err: unknown };
 
 function applyOutcome(review: Review, runId: string, outcome: Outcome, cancelMessage?: string): Review {
@@ -91,15 +102,18 @@ function applyOutcome(review: Review, runId: string, outcome: Outcome, cancelMes
   }
 
   const state = stateForError(outcome.err);
+  const errorKind = errorKindFor(outcome.err);
   const message =
     state === "cancelled" && cancelMessage
       ? cancelMessage
       : outcome.err instanceof AgentRunError && outcome.err.kind === "invalid"
-        ? `The agent's answer was not in the expected format. ${outcome.err.message}`
+        ? `The agent's answer was not in the expected format: ${outcome.err.message}.`
         : outcome.err instanceof Error
           ? outcome.err.message
           : String(outcome.err);
-  const runs = review.runs.map((candidate) => (candidate.id === runId ? { ...candidate, state, error: message, endedAt: now } : candidate));
+  const runs = review.runs.map((candidate) =>
+    candidate.id === runId ? { ...candidate, state, error: message, errorKind, endedAt: now } : candidate,
+  );
   return { ...review, runs };
 }
 

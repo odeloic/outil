@@ -141,7 +141,7 @@ function runProcess(
       if (settled) return;
       settled = true;
       cleanup();
-      reject(new AgentRunError("failed", err.code === "ENOENT" ? opts.notFoundMessage : err.message));
+      reject(err.code === "ENOENT" ? new AgentRunError("missing", opts.notFoundMessage) : new AgentRunError("failed", err.message));
     });
 
     child.on("exit", () => signalGroup("SIGKILL"));
@@ -200,6 +200,22 @@ function claudeToolActivity(block: Record<string, unknown>, cwd: string): string
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+const SHELL_WRAPPER_PATTERN = /^(?:\S*\/)?(?:zsh|bash|sh)\s+(?:-c|-lc|-l\s+-c)\s+(['"])([\s\S]*)\1$/;
+const MAX_COMMAND_CHARS = 120;
+
+function unescapeShellBody(quote: string, body: string): string {
+  if (quote === "'") return body.replace(/'"'"'|'\\''/g, "'");
+  return body.replace(/\\(["\\$`])/g, "$1");
+}
+
+function formatCodexCommand(command: string): string {
+  const trimmed = command.trim();
+  const match = SHELL_WRAPPER_PATTERN.exec(trimmed);
+  const text = match ? unescapeShellBody(match[1], match[2]) : trimmed;
+  const chars = Array.from(text);
+  return chars.length > MAX_COMMAND_CHARS ? `${chars.slice(0, MAX_COMMAND_CHARS).join("")}…` : text;
 }
 
 async function runClaude(options: RunAgentOptions): Promise<unknown> {
@@ -286,6 +302,13 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
     let resultText: string | undefined;
     let failure: string | null = null;
     let lastError: string | null = null;
+    let lastActivity: string | null = null;
+
+    function pushActivity(text: string) {
+      if (text === "Thinking" && lastActivity === "Thinking") return;
+      lastActivity = text;
+      options.onActivity?.(text);
+    }
 
     const { code, stderr } = await runProcess("codex", args, {
       cwd: options.cwd,
@@ -299,11 +322,11 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
         if (!isPlainObject(event)) return;
         const item = isPlainObject(event.item) ? event.item : undefined;
         if (event.type === "item.started" && item?.type === "command_execution" && typeof item.command === "string") {
-          options.onActivity?.(`Running ${item.command}`);
+          pushActivity(`Running ${formatCodexCommand(item.command)}`);
         }
         if (event.type === "item.completed" && item) {
           if (item.type === "reasoning") {
-            options.onActivity?.("Thinking");
+            pushActivity("Thinking");
           } else if (item.type === "agent_message" && typeof item.text === "string") {
             resultText = item.text;
           }
@@ -325,7 +348,7 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
     try {
       return JSON.parse(resultText);
     } catch {
-      throw new AgentRunError("invalid", "Codex's answer was not valid JSON.");
+      throw new AgentRunError("invalid", "not valid JSON");
     }
   } finally {
     await rm(schemaDir, { recursive: true, force: true });
@@ -334,7 +357,7 @@ async function runCodex(options: RunAgentOptions): Promise<unknown> {
 
 export async function runAgent(options: RunAgentOptions): Promise<unknown> {
   if (!MODEL_PATTERN.test(options.model)) {
-    throw new AgentRunError("invalid", `"${options.model}" is not a valid model id.`);
+    throw new AgentRunError("failed", `"${options.model}" is not a valid model id.`);
   }
   switch (options.agent) {
     case "claude":
@@ -342,6 +365,6 @@ export async function runAgent(options: RunAgentOptions): Promise<unknown> {
     case "codex":
       return runCodex(options);
     default:
-      throw new AgentRunError("invalid", `"${String(options.agent)}" is not a supported agent.`);
+      throw new AgentRunError("failed", `"${String(options.agent)}" is not a supported agent.`);
   }
 }

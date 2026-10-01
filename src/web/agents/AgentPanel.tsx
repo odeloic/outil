@@ -216,6 +216,11 @@ export function AgentPanel() {
                       ))}
                     </ul>
                   )}
+                  {agent === 'codex' && models.length > 0 && (
+                    <p className="agent-panel__hint">
+                      Codex lists models from your Codex config; a model from a custom provider may not run.
+                    </p>
+                  )}
                 </div>
                 <CheckAgainButton loading={agentsLoading} onClick={recheckAgents} />
               </div>

@@ -17,6 +17,7 @@ export type UseAgentChoice = {
   modelsError: string | null
   selectAgent: (agent: AgentId) => void
   selectModel: (model: string) => void
+  stored: StoredChoice | null
 }
 
 let stored: StoredChoice | null = loadAgentChoice()
@@ -73,5 +74,6 @@ export function useAgentChoice(): UseAgentChoice {
     modelsError,
     selectAgent,
     selectModel,
+    stored: current,
   }
 }

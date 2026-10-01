@@ -1,4 +1,4 @@
-export type AgentRunErrorKind = "failed" | "timeout" | "cancelled" | "invalid";
+export type AgentRunErrorKind = "failed" | "timeout" | "cancelled" | "invalid" | "missing";
 
 export class AgentRunError extends Error {
   readonly kind: AgentRunErrorKind;

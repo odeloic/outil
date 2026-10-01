@@ -51,16 +51,50 @@ reload, once it has finished and been persisted.
 - Node.js 24 or newer
 - git
 - To ask a coding agent for a review, [Claude Code](https://www.npmjs.com/package/@anthropic-ai/claude-code)
-  or [Codex](https://www.npmjs.com/package/@openai/codex) installed and signed in. Check availability any
-  time from the Agents panel in the review's left rail. Your choice of agent and model is
-  remembered in the browser (`localStorage`) and restored the next time you open the tool.
-  Codex's model list comes from `codex debug models`, which reads your Codex config; runs
-  themselves ignore user config (`--ignore-user-config`), so a model from a custom provider
-  in your config may be listed but not actually run.
+  or [Codex](https://www.npmjs.com/package/@openai/codex) installed and signed in — see Agents below.
 
-An agent run that does not answer within 10 minutes is stopped and reported as timed out.
-Set `OUTIL_AGENT_TIMEOUT_MS` (a positive number of milliseconds) to change that limit; an
-invalid or missing value keeps the default.
+## Agents
+
+Outil can send your drafts to a coding agent and show its replies in the same threads. Two
+agents are supported:
+
+- **Claude Code** — `npm install -g @anthropic-ai/claude-code`, then `claude auth login`.
+- **Codex** — `npm install -g @openai/codex`, then `codex login`.
+
+Check availability any time from the Agents panel in the review's left rail; a not-ready agent
+shows why and how to fix it. Your choice of agent and model is remembered in the browser
+(`localStorage`) and restored the next time you open the tool.
+
+### Read-only, every run
+
+An agent reviews a temporary snapshot of the reviewed commit — a plain checkout in a scratch
+directory, removed once the run ends — never your working copy or any uncommitted change.
+Neither agent can create, modify, or delete a file in your repository. Files committed in the
+reviewed commit, including its own `AGENTS.md` or `CLAUDE.md`, are part of the snapshot and are
+read like any other file:
+
+- **Claude Code** runs with `--tools Read,Grep,Glob` only (no Edit, Write, or Bash),
+  `--permission-mode dontAsk`, and `--restricted`; it skips your settings files
+  (`--setting-sources ""`) and MCP servers (`--strict-mcp-config`). Instruction files such as
+  `CLAUDE.md` may still be read.
+- **Codex** runs with `--sandbox read-only` and `approval_policy="never"`, so a command that
+  would write a file is refused outright instead of asking for approval; `--ignore-user-config`
+  and `--ignore-rules` skip your `config.toml` and execpolicy `.rules` files. Instruction files
+  such as `AGENTS.md` may still be read.
+
+A run that does not answer within 10 minutes is stopped and reported as timed out. Set
+`OUTIL_AGENT_TIMEOUT_MS` (a positive number of milliseconds) to change that limit; an invalid
+or missing value keeps the default.
+
+### Known differences with Codex
+
+- Codex's model list comes from `codex debug models`, which reads your Codex config; the run
+  itself ignores that config (`--ignore-user-config`), so a model from a custom provider in
+  your config may be listed but not actually run. The model picker says so under Codex's model
+  list.
+- Codex reports progress less often than Claude Code: the run progress panel can sit on the
+  same activity line for longer between updates. The run progress panel says so while Codex is
+  running.
 
 ## Develop
 

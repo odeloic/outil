@@ -38,6 +38,7 @@ export function RunProgress({ run, onCancel }: { run: Run; onCancel: () => Promi
         </Button>
       </div>
       {cancelError && <Note variant="failure">{cancelError}</Note>}
+      {run.agent === 'codex' && <p className="run-progress__hint">Codex reports progress less often than Claude Code.</p>}
       {latest && (
         <p className="run-progress__activity-line" aria-live="polite">
           {latest.text}

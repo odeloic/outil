@@ -332,7 +332,7 @@ describe("createRunner background run", () => {
   it("marks an invalid answer as failed with a composed message, and writes no agent message", async () => {
     const store = makeStore(makeReview([draftThread("t1")]));
     const ask: AskFn = async () => {
-      throw new AgentRunError("invalid", "The agent's answer was not a JSON object.");
+      throw new AgentRunError("invalid", "not a JSON object");
     };
     const { runner, waitFor } = makeRunner({ store, ask });
 
@@ -342,7 +342,8 @@ describe("createRunner background run", () => {
     const review = store.current();
     const run = review.runs[0];
     expect(run.state).toBe("failed");
-    expect(run.error).toBe("The agent's answer was not in the expected format. The agent's answer was not a JSON object.");
+    expect(run.error).toBe("The agent's answer was not in the expected format: not a JSON object.");
+    expect(run.errorKind).toBe("invalid");
     expect(review.threads[0].messages).toHaveLength(1);
     expect(review.threads.flatMap((t) => t.messages).some((m) => m.author === "agent")).toBe(false);
   });
@@ -375,6 +376,27 @@ describe("createRunner background run", () => {
 
     const retried = await runner.send(target, "claude", "haiku");
     expect(retried.runs.at(-1)).toMatchObject({ state: "running", threadIds: first.runs[0].threadIds });
+  });
+
+  it("sets errorKind from the AgentRunError kind and message, undefined for a plain failure", async () => {
+    const cases: Array<[() => Promise<never>, string | undefined]> = [
+      [() => Promise.reject(new AgentRunError("missing", "Claude Code is not installed.")), "missing"],
+      [() => Promise.reject(new AgentRunError("failed", "Not signed in. Run claude auth login.")), "agent"],
+      [() => Promise.reject(new AgentRunError("invalid", "malformed replies")), "invalid"],
+      [() => Promise.reject(new AgentRunError("failed", "boom")), undefined],
+      [() => Promise.reject(new AgentRunError("failed", "The author field broke the authorization header parser.")), undefined],
+      [() => Promise.reject(new AgentRunError("failed", "401 Unauthorized")), "agent"],
+      [() => Promise.reject(new AgentRunError("timeout", "too slow")), undefined],
+    ];
+    for (const [ask, expectedKind] of cases) {
+      const store = makeStore(makeReview([draftThread("t1")]));
+      const { runner, waitFor } = makeRunner({ store, ask });
+
+      await runner.send(target, "claude", "haiku");
+      await waitFor(2);
+
+      expect(store.current().runs[0].errorKind).toBe(expectedKind);
+    }
   });
 
   it("calls onChange after the send update and again after the run finishes", async () => {

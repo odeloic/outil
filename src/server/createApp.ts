@@ -34,10 +34,8 @@ export function parseAgentTimeoutMs(env: NodeJS.ProcessEnv): number | undefined 
   return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-const NOT_INSTALLED_PATTERN = /is not installed/;
-
 export function isAgentMissingError(err: unknown): boolean {
-  return err instanceof AgentRunError && err.kind === "failed" && NOT_INSTALLED_PATTERN.test(err.message);
+  return err instanceof AgentRunError && err.kind === "missing";
 }
 
 export function createApp(cwd: string) {

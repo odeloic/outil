@@ -281,6 +281,23 @@ describe("createFileStore", () => {
     expect(files.some((f) => f.startsWith(`${sha}.json.corrupt-`))).toBe(true);
   });
 
+  it("drops an unknown errorKind from a stored run and keeps the review", async () => {
+    const { dir, commit } = makeRepo();
+    const sha = commit("one");
+    const commonDir = execFileSync("git", ["-C", dir, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
+    const reviewsDir = join(dir, commonDir, "outil", "reviews");
+    execFileSync("mkdir", ["-p", reviewsDir]);
+    const run = { id: "r1", agent: "claude", model: "haiku", state: "failed", threadIds: [], startedAt: "x", endedAt: "x", summary: null, error: "e", owner: null, errorKind: "surprise" };
+    const malformed = { key: sha, target: { kind: "commit", sha }, base: null, head: sha, threads: [], runs: [run] };
+    writeFileSync(join(reviewsDir, `${sha}.json`), JSON.stringify(malformed));
+
+    const review = await createFileStore(dir, resolverFor(dir)).get({ kind: "commit", sha });
+
+    expect(review.runs).toHaveLength(1);
+    expect(review.runs[0]).not.toHaveProperty("errorKind");
+    expect(readdirSync(reviewsDir).some((f) => f.includes(".corrupt-"))).toBe(false);
+  });
+
   it("writes atomically and leaves no leftover tmp files", async () => {
     const { dir, commit } = makeRepo();
     const sha = commit("one");

@@ -33,6 +33,12 @@
   flex: none;
 }
 
+.run-progress__hint {
+  margin: 0;
+  font-size: var(--ods-text-2xs);
+  color: var(--ods-fg-2);
+}
+
 .run-progress__activity-line {
   margin: 0;
   font-family: var(--ods-font-mono);

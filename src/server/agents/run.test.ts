@@ -170,19 +170,19 @@ describe("runAgent — claude", () => {
   it("rejects an unsafe model id before spawning anything", async () => {
     await expect(
       runAgent({ agent: "claude", model: "haiku; rm -rf /", cwd: "/tmp", prompt: "hi", env: {} }),
-    ).rejects.toMatchObject({ kind: "invalid" });
+    ).rejects.toMatchObject({ kind: "failed" });
   });
 
   it("rejects a model id that starts with a dash", async () => {
     await expect(
       runAgent({ agent: "claude", model: "--dangerously-skip-permissions", cwd: "/tmp", prompt: "hi", env: {} }),
-    ).rejects.toMatchObject({ kind: "invalid" });
+    ).rejects.toMatchObject({ kind: "failed" });
   });
 
   it("rejects an unsupported agent id", async () => {
     await expect(
       runAgent({ agent: "gemini" as unknown as "claude", model: "haiku", cwd: "/tmp", prompt: "hi", env: {} }),
-    ).rejects.toMatchObject({ kind: "invalid" });
+    ).rejects.toMatchObject({ kind: "failed" });
   });
 
   it("fails when claude exits successfully with is_error false but no structured_output", async () => {
@@ -203,7 +203,7 @@ describe("runAgent — claude", () => {
 
     await expect(
       runAgent({ agent: "claude", model: "haiku", cwd: work, prompt: "hello", env: fakeEnv(bin) }),
-    ).rejects.toMatchObject({ kind: "failed", message: "Claude Code is not installed." });
+    ).rejects.toMatchObject({ kind: "missing", message: "Claude Code is not installed." });
   });
 
   it("kills a process that ignores SIGTERM after the SIGKILL fallback", async () => {
@@ -490,6 +490,77 @@ exit 0`;
 
     await expect(
       runAgent({ agent: "codex", model: "gpt-6.1-sol", cwd: work, prompt: "hello", env: fakeEnv(bin) }),
-    ).rejects.toMatchObject({ kind: "failed", message: "Codex is not installed." });
+    ).rejects.toMatchObject({ kind: "missing", message: "Codex is not installed." });
+  });
+
+  it("strips the shell wrapper from Running activity, truncates long commands, and shows Thinking at most once in a row", async () => {
+    const bin = await scratchDir();
+    const work = await scratchDir();
+    const longInner = "x".repeat(200);
+    const events = [
+      { type: "item.completed", item: { id: "item_0", type: "reasoning" } },
+      { type: "item.completed", item: { id: "item_1", type: "reasoning" } },
+      { type: "item.started", item: { id: "item_2", type: "command_execution", command: `/bin/zsh -lc "ls -la"` } },
+      { type: "item.started", item: { id: "item_3", type: "command_execution", command: `bash -lc '${longInner}'` } },
+      { type: "item.completed", item: { id: "item_4", type: "reasoning" } },
+      { type: "item.completed", item: { id: "item_5", type: "agent_message", text: JSON.stringify({ summary: "ok", replies: [] }) } },
+    ];
+    const outputFile = join(work, "output.jsonl");
+    await writeFile(outputFile, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+    await fakeCli(bin, "codex", `cat '${outputFile}'\nexit 0`);
+
+    const activity: string[] = [];
+    await runAgent({
+      agent: "codex",
+      model: "gpt-6.1-sol",
+      cwd: work,
+      prompt: "hello",
+      env: fakeEnv(bin),
+      onActivity: (text) => activity.push(text),
+    });
+
+    expect(activity).toEqual(["Thinking", "Running ls -la", `Running ${longInner.slice(0, 120)}…`, "Thinking"]);
+  });
+
+  it("unwraps -c, -lc, and -l -c shell wrappers, unescapes quoted bodies, and leaves plain commands untouched", async () => {
+    const bin = await scratchDir();
+    const work = await scratchDir();
+    const longInner = "x".repeat(200);
+    const commands = [
+      `sh -c 'ls'`,
+      `bash -c "ls"`,
+      `/bin/bash -l -c 'ls'`,
+      `bash -lc 'echo '"'"'hi'"'"''`,
+      `bash -lc "grep \\"foo\\" a.ts"`,
+      `git status`,
+      `bash -lc '${longInner}'`,
+    ];
+    const events = [
+      ...commands.map((command, i) => ({ type: "item.started", item: { id: `item_${i}`, type: "command_execution", command } })),
+      { type: "item.completed", item: { id: "item_last", type: "agent_message", text: JSON.stringify({ summary: "ok", replies: [] }) } },
+    ];
+    const outputFile = join(work, "output.jsonl");
+    await writeFile(outputFile, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+    await fakeCli(bin, "codex", `cat '${outputFile}'\nexit 0`);
+
+    const activity: string[] = [];
+    await runAgent({
+      agent: "codex",
+      model: "gpt-6.1-sol",
+      cwd: work,
+      prompt: "hello",
+      env: fakeEnv(bin),
+      onActivity: (text) => activity.push(text),
+    });
+
+    expect(activity).toEqual([
+      "Running ls",
+      "Running ls",
+      "Running ls",
+      "Running echo 'hi'",
+      'Running grep "foo" a.ts',
+      "Running git status",
+      `Running ${longInner.slice(0, 120)}…`,
+    ]);
   });
 });

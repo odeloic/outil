@@ -22,6 +22,7 @@ function makeApp(overrides: Partial<RouteDeps>) {
     editDraft: unstubbed,
     deleteDraft: unstubbed,
     addFollowUp: unstubbed,
+    resolveThread: unstubbed,
     detectAgents: unstubbed,
     listModels: unstubbed,
     send: unstubbed,
@@ -571,6 +572,89 @@ describe("POST /api/review/threads/:id/messages", () => {
 
     for (const json of [{ target }, { target, body: "" }, { target, body: "   " }]) {
       const res = await app.request("/api/review/threads/t1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(json),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("POST /api/review/threads/:id/resolve", () => {
+  const target: ReviewTarget = { kind: "commit", sha };
+
+  it("resolves the thread and returns the updated review", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      resolveThread: async (t, id, resolved) => {
+        calls.push([t, id, resolved]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, resolved: true }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "t1", true]]);
+  });
+
+  it("reopens the thread when resolved is false", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      resolveThread: async (t, id, resolved) => {
+        calls.push([t, id, resolved]);
+        return emptyReview(t);
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, resolved: false }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([[target, "t1", false]]);
+  });
+
+  it("returns 404 for an unknown thread id", async () => {
+    const app = makeApp({
+      resolveThread: async () => {
+        throw new ReviewError(404, "No thread with id t1.");
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, resolved: true }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 when the thread is part of a run in progress", async () => {
+    const app = makeApp({
+      resolveThread: async () => {
+        throw new ReviewError(409, "This thread is part of a run in progress.");
+      },
+    });
+
+    const res = await app.request("/api/review/threads/t1/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target, resolved: true }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects a request without a valid target or resolved flag", async () => {
+    const app = makeApp({});
+
+    for (const json of [{ resolved: true }, { target, resolved: "yes" }, { target }]) {
+      const res = await app.request("/api/review/threads/t1/resolve", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(json),

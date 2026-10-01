@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AgentId, ChangeSet, Review as ReviewData, ReviewTarget, Run, Thread } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
-import { draftCount, threadStatus } from '../../shared/review.ts'
+import { draftCount, openThreadCount, threadStatus } from '../../shared/review.ts'
 import { AgentPanel } from '../agents/AgentPanel.tsx'
 import { useAgentChoice } from '../agents/useAgentChoice.ts'
 import { useModelLabel } from '../agents/useAgentModels.ts'
 import { FileDiffView } from '../diff/FileDiffView.tsx'
-import { Avatar, Button, CountBadge, Note, Tabs } from '../design-system'
+import { Avatar, Button, CountBadge, Kbd, Note, Tabs } from '../design-system'
 import { relativeTime } from '../format.ts'
 import { initials } from '../threads/initials.ts'
+import { MessageBody } from '../threads/MessageBody.tsx'
 import { DisplayOptions } from './DisplayOptions.tsx'
 import { FileList } from './FileList.tsx'
 import { HistoryList } from './HistoryList.tsx'
-import { jumpToFile, resetNavigation, useCurrentFile } from './navigation.ts'
+import { adjacentOpenThread, focusThread, jumpToFile, orderOpenThreads, resetNavigation, useCurrentFile } from './navigation.ts'
 import { RunEndNote } from './RunEndNote.tsx'
 import { RunProgress } from './RunProgress.tsx'
 import { useReview } from './useReview.ts'
@@ -107,7 +108,11 @@ function SendPanel({
               {AGENT_NAMES[latestRun.agent]} · {latestRunModelLabel ?? latestRun.model}
               {latestRun.endedAt && <span className="review__run-summary-time"> · {relativeTime(latestRun.endedAt)}</span>}
             </p>
-            {latestRun.summary && <p className="review__run-summary-text">{latestRun.summary}</p>}
+            {latestRun.summary && (
+              <div className="review__run-summary-text">
+                <MessageBody body={latestRun.summary} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -158,7 +163,8 @@ export function Review({
   const collapsedOverrides = overrides.key === reviewKey ? overrides.map : new Map<string, boolean>()
   const [railTab, setRailTab] = useState<RailTab>('files')
   const current = useCurrentFile(changes.files.length)
-  const { review, error, reviewer, createThread, editDraft, deleteDraft, addFollowUp, send, cancel, markRead } = useReview(reviewTarget)
+  const { review, error, reviewer, createThread, editDraft, deleteDraft, addFollowUp, resolveThread, send, cancel, markRead } =
+    useReview(reviewTarget)
   const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
   const threadsByPath = useMemo(() => {
     const map = new Map<string, Thread[]>()
@@ -171,12 +177,44 @@ export function Review({
   }, [review])
   const drafts = review ? draftCount(review) : 0
   const runs = review?.runs ?? NO_RUNS
+  const openCount = review ? openThreadCount(review) : 0
+  const pathIndex = useMemo(() => new Map(changes.files.map((file, index) => [file.path, index])), [changes])
+  const filePaths = useMemo(() => changes.files.map((file) => file.path), [changes])
+  const openThreads = useMemo(() => (review ? orderOpenThreads(filePaths, review.threads) : []), [review, filePaths])
+  const [navState, setNavState] = useState<{ key: string; thread: Thread | null }>({ key: reviewKey, thread: null })
+  if (navState.key !== reviewKey) setNavState({ key: reviewKey, thread: null })
+  const navThread = navState.key === reviewKey ? navState.thread : null
 
   useEffect(() => resetNavigation, [reviewKey])
 
   const setCollapsed = useCallback((path: string, collapsed: boolean) => {
     setOverrides(({ key, map }) => ({ key, map: new Map(map).set(path, collapsed) }))
   }, [])
+
+  const goToOpenThread = useCallback(
+    (direction: 1 | -1) => {
+      const thread = adjacentOpenThread(filePaths, openThreads, navThread, direction)
+      if (!thread) return
+      setNavState({ key: reviewKey, thread })
+      setCollapsed(thread.anchor.path, false)
+      const fileIndex = pathIndex.get(thread.anchor.path)
+      if (fileIndex !== undefined) focusThread(thread.id, fileIndex)
+    },
+    [filePaths, openThreads, navThread, pathIndex, setCollapsed, reviewKey],
+  )
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '[' && event.key !== ']') return
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT' || target?.isContentEditable) return
+      event.preventDefault()
+      goToOpenThread(event.key === ']' ? 1 : -1)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [goToOpenThread])
 
   const markViewed = useCallback(
     (path: string, value: boolean) => {
@@ -205,6 +243,19 @@ export function Review({
               <CountBadge count={drafts} />
             </div>
             <p className="review__summary-text">{drafts === 0 ? 'No drafts' : `${drafts} ${drafts === 1 ? 'draft' : 'drafts'} not sent`}</p>
+            <div className="review__open-threads">
+              <span className="review__summary-text">
+                {openCount} open {openCount === 1 ? 'thread' : 'threads'}
+              </span>
+              <span className="review__open-threads-nav">
+                <Button variant="ghost" onClick={() => goToOpenThread(-1)} disabled={openThreads.length === 0} aria-label="Previous open thread">
+                  <Kbd>[</Kbd> Previous
+                </Button>
+                <Button variant="ghost" onClick={() => goToOpenThread(1)} disabled={openThreads.length === 0} aria-label="Next open thread">
+                  Next <Kbd>]</Kbd>
+                </Button>
+              </span>
+            </div>
             {error && <Note variant="failure">{error}</Note>}
             <AgentPanel />
             <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
@@ -258,6 +309,7 @@ export function Review({
                 onDeleteDraft={deleteDraft}
                 onReply={addFollowUp}
                 onMarkRead={markRead}
+                onResolve={resolveThread}
               />
             )
           })}

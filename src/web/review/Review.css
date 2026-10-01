@@ -74,6 +74,18 @@
   pointer-events: none;
 }
 
+.review__open-threads {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ods-space-3);
+}
+
+.review__open-threads-nav {
+  display: flex;
+  gap: var(--ods-space-2);
+}
+
 .review__send {
   display: flex;
   flex-direction: column;

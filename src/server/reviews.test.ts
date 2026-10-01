@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Review, ReviewTarget } from "../shared/api.ts";
+import type { Review, ReviewTarget, Run } from "../shared/api.ts";
 import {
   addFollowUp,
   assertAnchorInDiff,
@@ -8,6 +8,7 @@ import {
   deleteDraft,
   editDraft,
   markThreadRead,
+  resolveThread,
   ReviewError,
 } from "./reviews.ts";
 
@@ -252,6 +253,74 @@ describe("addFollowUp", () => {
     const before = JSON.stringify(review);
 
     addFollowUp(review, "t1", "more");
+    expect(JSON.stringify(review)).toBe(before);
+  });
+});
+
+function runningRun(threadIds: string[]): Run {
+  return {
+    id: "r1",
+    agent: "claude",
+    model: "sonnet",
+    state: "running",
+    threadIds,
+    startedAt: "d",
+    endedAt: null,
+    summary: null,
+    error: null,
+    owner: null,
+  };
+}
+
+describe("resolveThread", () => {
+  it("marks a thread as resolved", () => {
+    const review = createThread(emptyReview(), anchor, "one");
+
+    const resolved = resolveThread(review, "t1", true);
+    expect(resolved.threads[0].resolved).toBe(true);
+  });
+
+  it("reopens a resolved thread", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = { ...review, threads: review.threads.map((t) => ({ ...t, resolved: true })) };
+
+    const reopened = resolveThread(review, "t1", false);
+    expect(reopened.threads[0].resolved).toBe(false);
+  });
+
+  it("is a no-op when the thread already has the requested resolved state", () => {
+    const review = createThread(emptyReview(), anchor, "one");
+
+    const result = resolveThread(review, "t1", false);
+    expect(result).toBe(review);
+  });
+
+  it("throws a 404 ReviewError for an unknown thread id", () => {
+    expect(() => resolveThread(emptyReview(), "nope", true)).toThrow(ReviewError);
+    try {
+      resolveThread(emptyReview(), "nope", true);
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(404);
+    }
+  });
+
+  it("throws a 409 ReviewError when resolving a thread that is part of a running run", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = { ...review, runs: [runningRun(["t1"])] };
+
+    expect(() => resolveThread(review, "t1", true)).toThrow(ReviewError);
+    try {
+      resolveThread(review, "t1", true);
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(409);
+    }
+  });
+
+  it("does not mutate the original review", () => {
+    const review = createThread(emptyReview(), anchor, "one");
+    const before = JSON.stringify(review);
+
+    resolveThread(review, "t1", true);
     expect(JSON.stringify(review)).toBe(before);
   });
 });

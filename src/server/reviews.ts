@@ -141,6 +141,19 @@ export function addFollowUp(review: Review, threadId: string, body: string): Rev
   return { ...review, threads };
 }
 
+export function resolveThread(review: Review, threadId: string, resolved: boolean): Review {
+  const index = review.threads.findIndex((thread) => thread.id === threadId);
+  if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);
+  if (resolved && review.runs.some((run) => run.state === "running" && run.threadIds.includes(threadId))) {
+    throw new ReviewError(409, "This thread is part of a run in progress.");
+  }
+  const thread = review.threads[index];
+  if (thread.resolved === resolved) return review;
+  const threads = review.threads.slice();
+  threads[index] = { ...thread, resolved };
+  return { ...review, threads };
+}
+
 export function markThreadRead(review: Review, threadId: string): Review {
   const index = review.threads.findIndex((thread) => thread.id === threadId);
   if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);

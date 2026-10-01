@@ -40,6 +40,7 @@ export type RouteDeps = {
   editDraft: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
   deleteDraft: (target: ReviewTarget, id: string) => Promise<Review>;
   addFollowUp: (target: ReviewTarget, id: string, body: string) => Promise<Review>;
+  resolveThread: (target: ReviewTarget, id: string, resolved: boolean) => Promise<Review>;
   detectAgents: (refresh: boolean) => Promise<AgentStatus[]>;
   listModels: (agent: AgentId) => Promise<AgentModel[]>;
   send: (target: ReviewTarget, agent: AgentId, model: string) => Promise<Review>;
@@ -151,6 +152,14 @@ const targetOnlyBody = validator("json", (body, c): { target: ReviewTarget } | R
   return { target };
 });
 
+const resolveBody = validator("json", (body, c): { target: ReviewTarget; resolved: boolean } | Response => {
+  const { target, resolved } = (body ?? {}) as Record<string, unknown>;
+  if (!isReviewTarget(target) || typeof resolved !== "boolean") {
+    return c.json({ error: "A resolve needs a target and a resolved flag." } satisfies ApiError, 400);
+  }
+  return { target, resolved };
+});
+
 const agentsQuery = validator("query", (query): { refresh?: string } => (query.refresh === "1" ? { refresh: "1" } : {}));
 
 function isAgentId(value: string): value is AgentId {
@@ -212,6 +221,7 @@ export function createRoutes({
   editDraft,
   deleteDraft,
   addFollowUp,
+  resolveThread,
   detectAgents,
   listModels,
   send,
@@ -330,6 +340,14 @@ export function createRoutes({
       const { target, body } = c.req.valid("json");
       try {
         return c.json(await addFollowUp(target, c.req.param("id"), body), 200);
+      } catch (err) {
+        return c.json(...reviewFailure(err));
+      }
+    })
+    .post("/api/review/threads/:id/resolve", resolveBody, async (c) => {
+      const { target, resolved } = c.req.valid("json");
+      try {
+        return c.json(await resolveThread(target, c.req.param("id"), resolved), 200);
       } catch (err) {
         return c.json(...reviewFailure(err));
       }

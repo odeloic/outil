@@ -4,8 +4,10 @@ import { AGENT_NAMES } from '../../shared/agents.ts'
 import { threadStatus } from '../../shared/review.ts'
 import { useModelLabel } from '../agents/useAgentModels.ts'
 import { Avatar, Button, Note, StatusChip } from '../design-system'
+import { threadCardId } from '../review/navigation.ts'
 import { anchorLabel } from './anchorLabel.ts'
 import { Composer } from './Composer.tsx'
+import { MessageBody } from './MessageBody.tsx'
 import { useVisibleFor } from './useVisibleFor.ts'
 import './Threads.css'
 
@@ -20,6 +22,7 @@ type Props = {
   onDelete: (id: string, anchor: ThreadAnchor) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
+  onResolve: (id: string, resolved: boolean) => Promise<unknown>
 }
 
 function AgentBubble({ message }: { message: AgentMessage }) {
@@ -29,7 +32,7 @@ function AgentBubble({ message }: { message: AgentMessage }) {
       <Avatar kind="agent" />
       <div className="thread-card__agent-bubble">
         <p className="thread-card__agent-header">{`${AGENT_NAMES[message.agent]} · ${label}`}</p>
-        <p className="thread-card__body">{message.body}</p>
+        <MessageBody body={message.body} />
       </div>
     </div>
   )
@@ -46,10 +49,14 @@ export function ThreadView({
   onDelete,
   onReply,
   onMarkRead,
+  onResolve,
 }: Props) {
   const status = threadStatus(thread, runs)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [resolving, setResolving] = useState(false)
+  const [resolveError, setResolveError] = useState<string | null>(null)
+  const [showResolved, setShowResolved] = useState(false)
   const label = anchorLabel(thread.anchor)
   const cardRef = useRef<HTMLDivElement>(null)
   const hasUnreadAgent = thread.messages.some((message) => message.author === 'agent' && !message.read)
@@ -58,10 +65,34 @@ export function ThreadView({
   const markedIdRef = useRef<string | null>(null)
   const isNewDraftThread = status === 'draft' && thread.messages.length === 1
   const canReply = status === 'answered'
+  const inRunningRun = runs.some((run) => run.state === 'running' && run.threadIds.includes(thread.id))
   const [replyState, setReplyState] = useState<{ canReply: boolean; replying: boolean }>({ canReply, replying: false })
   if (replyState.canReply !== canReply) setReplyState({ canReply, replying: false })
   const replying = replyState.replying
   const setReplying = (value: boolean) => setReplyState((prev) => ({ ...prev, replying: value }))
+  const [pendingFocus, setPendingFocus] = useState<'reply' | 'draft-edit' | null>(null)
+
+  useEffect(() => {
+    if (!pendingFocus || !cardRef.current) return
+    const selector = pendingFocus === 'reply' ? '.thread-card__reply-button' : '.thread-card__actions button'
+    const button = cardRef.current.querySelector<HTMLButtonElement>(selector)
+    if (button) {
+      button.focus()
+      setPendingFocus(null)
+    }
+  }, [pendingFocus, thread])
+
+  const handleReplySave = (body: string) =>
+    onReply(thread.id, body).then((result) => {
+      setReplying(false)
+      setPendingFocus('draft-edit')
+      return result
+    })
+
+  const handleReplyCancel = () => {
+    setReplying(false)
+    setPendingFocus('reply')
+  }
 
   useEffect(() => {
     if (!seenLongEnough || !unread || markedIdRef.current === thread.id) return
@@ -81,12 +112,74 @@ export function ThreadView({
     })
   }
 
+  const handleResolve = (resolved: boolean) => {
+    if (resolving) return
+    setResolving(true)
+    setResolveError(null)
+    onResolve(thread.id, resolved)
+      .then(() => {
+        if (resolved) setShowResolved(false)
+      })
+      .catch((err: Error) => setResolveError(err.message))
+      .finally(() => setResolving(false))
+  }
+
+  if (thread.resolved && !showResolved) {
+    const firstLine = (thread.messages[0]?.body ?? '').split('\n')[0]
+    return (
+      <div ref={cardRef} id={threadCardId(thread.id)} tabIndex={-1} className="thread-card thread-card--resolved thread-card--collapsed">
+        <div className="thread-card__header">
+          <StatusChip status="resolved" />
+          <span className="thread-card__anchor">{label}</span>
+          <span className="thread-card__collapsed-text">{firstLine}</span>
+          <span className="thread-card__header-actions">
+            <Button variant="ghost" onClick={() => setShowResolved(true)} aria-label={`Show resolved thread on ${label}`}>
+              Show
+            </Button>
+            <Button variant="ghost" onClick={() => handleResolve(false)} disabled={resolving} aria-label={`Reopen thread on ${label}`}>
+              {resolving ? 'Reopening…' : 'Reopen'}
+            </Button>
+          </span>
+        </div>
+        {resolveError && <Note variant="failure">{resolveError}</Note>}
+      </div>
+    )
+  }
+
   return (
-    <div ref={cardRef} className={`thread-card${isNewDraftThread ? ' thread-card--draft' : ''}`}>
+    <div
+      ref={cardRef}
+      id={threadCardId(thread.id)}
+      tabIndex={-1}
+      className={`thread-card${isNewDraftThread ? ' thread-card--draft' : ''}${thread.resolved ? ' thread-card--resolved' : ''}`}
+    >
       <div className="thread-card__header">
         <StatusChip status={status} unread={unread} />
         <span className="thread-card__anchor">{label}</span>
+        <span className="thread-card__header-actions">
+          {thread.resolved ? (
+            <>
+              <Button variant="ghost" onClick={() => setShowResolved(false)} aria-label={`Hide resolved thread on ${label}`}>
+                Hide
+              </Button>
+              <Button variant="ghost" onClick={() => handleResolve(false)} disabled={resolving} aria-label={`Reopen thread on ${label}`}>
+                {resolving ? 'Reopening…' : 'Reopen'}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => handleResolve(true)}
+              disabled={resolving || inRunningRun}
+              aria-label={`Resolve thread on ${label}`}
+              title={inRunningRun ? 'Wait for the run to finish before resolving.' : undefined}
+            >
+              {resolving ? 'Resolving…' : 'Resolve'}
+            </Button>
+          )}
+        </span>
       </div>
+      {resolveError && <Note variant="failure">{resolveError}</Note>}
       {thread.messages.map((message) =>
         editingId === message.id ? (
           <Composer
@@ -106,7 +199,7 @@ export function ThreadView({
             <Avatar kind="reviewer" initials={reviewerInitials} />
             <div className="thread-card__body-wrap">
               <p className="thread-card__body">{message.body}</p>
-              {message.state === 'draft' && (
+              {message.state === 'draft' && !thread.resolved && (
                 <span className="thread-card__actions">
                   <Button variant="ghost" onClick={() => onStartEdit(message.id)} aria-label={`Edit comment on ${label}`}>
                     Edit
@@ -122,10 +215,11 @@ export function ThreadView({
       )}
       {deleteError && <Note variant="failure">{deleteError}</Note>}
       {canReply &&
+        !thread.resolved &&
         (replying ? (
-          <Composer onSave={(body) => onReply(thread.id, body)} onCancel={() => setReplying(false)} ariaLabel={`Reply on ${label}`} />
+          <Composer onSave={handleReplySave} onCancel={handleReplyCancel} ariaLabel={`Reply on ${label}`} />
         ) : (
-          <Button variant="ghost" onClick={() => setReplying(true)} aria-label={`Reply on ${label}`}>
+          <Button className="thread-card__reply-button" variant="ghost" onClick={() => setReplying(true)} aria-label={`Reply on ${label}`}>
             Reply
           </Button>
         ))}

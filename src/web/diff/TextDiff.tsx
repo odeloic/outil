@@ -32,9 +32,22 @@ type Props = {
   onDeleteDraft: (id: string) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
+  onResolve: (id: string, resolved: boolean) => Promise<unknown>
 }
 
-export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreateThread, onEditDraft, onDeleteDraft, onReply, onMarkRead }: Props) {
+export function TextDiff({
+  path,
+  diff,
+  threads,
+  runs,
+  reviewerInitials,
+  onCreateThread,
+  onEditDraft,
+  onDeleteDraft,
+  onReply,
+  onMarkRead,
+  onResolve,
+}: Props) {
   const { layout, wrap } = useDisplaySettings()
   const [expansions, setExpansions] = useState<ReadonlyMap<number, Expansion>>(new Map())
   const [tokens, setTokens] = useState<Tokens | null>(null)
@@ -217,6 +230,7 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
         onDelete,
         onReply,
         onMarkRead,
+        onResolve,
       },
       heightStore,
     }),
@@ -236,6 +250,7 @@ export function TextDiff({ path, diff, threads, runs, reviewerInitials, onCreate
       onDelete,
       onReply,
       onMarkRead,
+      onResolve,
       heightStore,
     ],
   )

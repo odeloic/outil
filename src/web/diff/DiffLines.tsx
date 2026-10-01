@@ -31,6 +31,7 @@ export type ThreadHandlers = {
   onDelete: (id: string, anchor: ThreadAnchor) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
+  onResolve: (id: string, resolved: boolean) => Promise<unknown>
 }
 
 export type Comments = {
@@ -311,6 +312,7 @@ function ExtrasAtRow({ index, comments, pane = null }: { index: number; comments
               onDelete={threadHandlers.onDelete}
               onReply={threadHandlers.onReply}
               onMarkRead={threadHandlers.onMarkRead}
+              onResolve={threadHandlers.onResolve}
             />
           ) : (
             <PendingThreadCard anchor={extra.anchor} onSave={pendingComposer.onSave} onCancel={pendingComposer.onCancel} />

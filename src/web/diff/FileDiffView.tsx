@@ -21,6 +21,7 @@ type CommentProps = {
   onDeleteDraft: (id: string) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>
   onMarkRead: (id: string) => Promise<unknown>
+  onResolve: (id: string, resolved: boolean) => Promise<unknown>
 }
 
 function formatBytes(bytes: number): string {
@@ -39,6 +40,7 @@ function FileBody({
   onDeleteDraft,
   onReply,
   onMarkRead,
+  onResolve,
 }: { range: Range; file: FileChange; placeholderLines: number } & CommentProps) {
   const [diff, setDiff] = useState<FileDiff | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +103,7 @@ function FileBody({
       onDeleteDraft={onDeleteDraft}
       onReply={onReply}
       onMarkRead={onMarkRead}
+      onResolve={onResolve}
     />
   )
 }
@@ -131,6 +134,7 @@ export const FileDiffView = memo(function FileDiffView({
   onDeleteDraft,
   onReply,
   onMarkRead,
+  onResolve,
 }: FileDiffViewProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const nearby = useInView(bodyRef, '1200px 0px')
@@ -190,6 +194,7 @@ export const FileDiffView = memo(function FileDiffView({
             onDeleteDraft={onDeleteDraft}
             onReply={onReply}
             onMarkRead={onMarkRead}
+            onResolve={onResolve}
           />
         )}
       </div>

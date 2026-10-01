@@ -157,6 +157,23 @@ describe("createRunner.send", () => {
     const review = await runner.send(target, "claude", "haiku");
     expect(review.runs[0].threadIds).toEqual(["t1"]);
   });
+
+  it("excludes resolved threads from a send, even when they have a draft or are unanswered", async () => {
+    const resolvedDraft = { ...draftThread("t1"), resolved: true };
+    const resolvedSent = { ...sentThread("t2"), resolved: true };
+    const store = makeStore(makeReview([resolvedDraft, resolvedSent, draftThread("t3")]));
+    const { runner } = makeRunner({ store });
+
+    const review = await runner.send(target, "claude", "haiku");
+    expect(review.runs[0].threadIds).toEqual(["t3"]);
+  });
+
+  it("rejects with 400 when the only threads are resolved", async () => {
+    const store = makeStore(makeReview([{ ...draftThread("t1"), resolved: true }]));
+    const { runner } = makeRunner({ store });
+
+    await expect(runner.send(target, "claude", "haiku")).rejects.toMatchObject({ status: 400 });
+  });
 });
 
 describe("createRunner reconciliation", () => {

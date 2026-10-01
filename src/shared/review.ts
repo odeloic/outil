@@ -15,7 +15,18 @@ export function threadStatus(thread: Thread, runs: Run[]): ThreadStatus {
 export function draftCount(review: Review): number {
   return review.threads.reduce(
     (count, thread) =>
-      count + thread.messages.filter((message) => message.author === "reviewer" && message.state === "draft").length,
+      thread.resolved
+        ? count
+        : count + thread.messages.filter((message) => message.author === "reviewer" && message.state === "draft").length,
     0,
   )
+}
+
+export function isOpenThread(thread: Thread): boolean {
+  if (thread.resolved) return false
+  return thread.messages.some((message) => (message.author === "reviewer" && message.state === "sent") || message.author === "agent")
+}
+
+export function openThreadCount(review: Review): number {
+  return review.threads.filter(isOpenThread).length
 }

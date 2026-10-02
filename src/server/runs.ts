@@ -48,10 +48,15 @@ function defaultIsAlivePid(pid: number): boolean {
   }
 }
 
-function isSendable(thread: Thread): boolean {
+function hasDraft(thread: Thread): boolean {
+  return thread.messages.some((message) => message.author === "reviewer" && message.state === "draft");
+}
+
+function isSendable(thread: Thread, active: Set<string>): boolean {
   if (thread.resolved) return false;
   const last = thread.messages[thread.messages.length - 1];
-  return last?.author === "reviewer";
+  if (last?.author !== "reviewer") return false;
+  return hasDraft(thread) || !active.has(thread.id);
 }
 
 function threadIdsIn(review: Review, states: RunState[]): Set<string> {
@@ -365,17 +370,22 @@ export function createRunner({
       const runId = crypto.randomUUID();
       const updated = await store.update(target, (input) => {
         const review = reconcile(input);
+        const active = threadIdsIn(review, ["queued", "running"]);
         let targets: Thread[];
         if (requested) {
           const byId = new Map(review.threads.map((thread) => [thread.id, thread]));
           const unique = [...new Set(requested)];
-          targets = unique.map((id) => byId.get(id)).filter((thread): thread is Thread => thread !== undefined && isSendable(thread));
+          const found = unique.map((id) => byId.get(id));
+          const waiting = found.some(
+            (thread) => thread !== undefined && !thread.resolved && thread.messages.at(-1)?.author === "reviewer" && !isSendable(thread, active),
+          );
+          if (waiting) throw new ReviewError(409, "This thread is waiting for a reply.");
+          targets = found.filter((thread): thread is Thread => thread !== undefined && isSendable(thread, active));
           if (targets.length === 0 || targets.length !== unique.length) {
             throw new ReviewError(400, "A thread can only be sent when it is unresolved and the reviewer wrote last.");
           }
         } else {
-          const taken = threadIdsIn(review, ["queued", "running"]);
-          targets = review.threads.filter((thread) => isSendable(thread) && !taken.has(thread.id));
+          targets = review.threads.filter((thread) => isSendable(thread, active));
           if (targets.length === 0) throw new ReviewError(400, "There is nothing to send.");
         }
 

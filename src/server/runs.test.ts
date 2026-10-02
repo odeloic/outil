@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentStatus, Review, ReviewTarget, Run, Thread } from "../shared/api.ts";
 import { threadStatus } from "../shared/review.ts";
 import { AgentRunError } from "./agents/errors.ts";
-import type { ReviewStore } from "./reviews.ts";
+import { addFollowUp, type ReviewStore } from "./reviews.ts";
 import { createRunner, type AskFn, type RunnerDeps } from "./runs.ts";
 
 const sha = "a".repeat(40);
@@ -613,6 +613,7 @@ describe("createRunner concurrency", () => {
     gates[1].open();
     await until(() => stateOf(store, 1) === "done");
 
+    await store.update(target, (review) => addFollowUp(review, "t1", "again"));
     await runner.send(target, "claude", "haiku", null, ["t1", "t3"]);
     await runner.send(target, "claude", "haiku", null, ["t4"]);
 
@@ -689,6 +690,90 @@ describe("createRunner concurrency", () => {
     }
     expect(store.current().runs).toEqual([]);
     expect(store.current().threads[1].messages[0]).toMatchObject({ state: "draft" });
+  });
+});
+
+describe("createRunner waiting threads", () => {
+  it("rejects Send now with 409 on a thread in a running run that has no new draft, and creates no run", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { ask, gates } = gatedAsk();
+    const { runner } = makeRunner({ store, ask });
+
+    await runner.send(target, "claude", "haiku", null, ["t1"]);
+    await until(() => gates.length === 1);
+
+    await expect(runner.send(target, "claude", "haiku", null, ["t1"])).rejects.toMatchObject({
+      status: 409,
+      message: "This thread is waiting for a reply.",
+    });
+    expect(store.current().runs).toHaveLength(1);
+  });
+
+  it("rejects Send now with 409 on a thread in a queued run that has no new draft", async () => {
+    const store = makeStore(makeReview([draftThread("t1"), draftThread("t2")]));
+    const { ask } = gatedAsk();
+    const { runner } = makeRunner({ store, ask, maxRuns: 1 });
+
+    await runner.send(target, "claude", "haiku", null, ["t1"]);
+    await runner.send(target, "claude", "haiku", null, ["t2"]);
+
+    await expect(runner.send(target, "claude", "haiku", null, ["t2"])).rejects.toMatchObject({ status: 409 });
+    expect(store.current().runs).toHaveLength(2);
+  });
+
+  it("never puts a waiting thread without a draft into a batch run, and includes one with a draft", async () => {
+    const store = makeStore(makeReview([draftThread("t1"), draftThread("t2")]));
+    const { ask, gates } = gatedAsk();
+    const { runner } = makeRunner({ store, ask });
+
+    await runner.send(target, "claude", "haiku", null, ["t1"]);
+    await runner.send(target, "claude", "haiku", null, ["t2"]);
+    await until(() => gates.length === 2);
+    await expect(runner.send(target, "claude", "haiku")).rejects.toMatchObject({ status: 400 });
+
+    store.current().threads[0].messages.push({ id: "f1", author: "reviewer", body: "Again", createdAt: "d", state: "draft" });
+    const batch = await runner.send(target, "claude", "haiku");
+
+    expect(batch.runs).toHaveLength(3);
+    expect(batch.runs[2]).toMatchObject({ state: "queued", threadIds: ["t1"] });
+  });
+
+  it("runs the full follow-up flow: Q1 running, F1 drafted, A1 lands between them and the thread is a draft", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { ask, gates } = gatedAsk();
+    const { runner } = makeRunner({ store, ask });
+
+    await runner.send(target, "claude", "haiku");
+    await until(() => gates.length === 1);
+    const withFollowUp = addFollowUp(store.current(), "t1", "F1");
+    await store.update(target, () => withFollowUp);
+
+    gates[0].open({ summary: "s", replies: [{ threadId: "t1", body: "A1" }], unanswered: [] });
+    await until(() => stateOf(store, 0) === "done");
+
+    const thread = store.current().threads[0];
+    expect(thread.messages.map((m) => m.body)).toEqual(["about t1", "A1", "F1"]);
+    expect(threadStatus(thread, store.current().runs)).toBe("draft");
+  });
+
+  it("runs the Send now follow-up flow: F1 queues behind the run and its prompt includes A1", async () => {
+    const store = makeStore(makeReview([draftThread("t1")]));
+    const { ask, gates } = gatedAsk();
+    const { runner } = makeRunner({ store, ask });
+
+    await runner.send(target, "claude", "haiku", null, ["t1"]);
+    await until(() => gates.length === 1);
+    await store.update(target, (review) => addFollowUp(review, "t1", "F1"));
+
+    const second = await runner.send(target, "claude", "haiku", null, ["t1"]);
+    expect(second.runs.map((r) => r.state)).toEqual(["running", "queued"]);
+
+    gates[0].open({ summary: "s", replies: [{ threadId: "t1", body: "A1" }], unanswered: [] });
+    await until(() => gates.length === 2);
+
+    expect(gates[1].options.prompt).toContain("Agent (claude · haiku): A1");
+    expect(gates[1].options.prompt).toContain("Reviewer: F1");
+    expect(store.current().threads[0].messages.map((m) => m.body)).toEqual(["about t1", "A1", "F1"]);
   });
 });
 

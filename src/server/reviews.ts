@@ -127,10 +127,10 @@ export function addFollowUp(review: Review, threadId: string, body: string): Rev
   const thread = review.threads[index];
   if (thread.resolved) throw new ReviewError(409, "This thread is resolved.");
   const last = thread.messages[thread.messages.length - 1];
-  if (!last || last.author !== "agent") {
-    const reason = last?.author === "reviewer" && last.state === "draft" ? "This thread already has a pending draft." : "This thread is waiting for a reply.";
-    throw new ReviewError(409, reason);
+  if (last?.author === "reviewer" && last.state === "draft") {
+    throw new ReviewError(409, "This thread already has a pending draft.");
   }
+  if (!last) throw new ReviewError(409, "This thread has no messages.");
   const message = {
     id: crypto.randomUUID(),
     author: "reviewer" as const,
@@ -146,7 +146,7 @@ export function addFollowUp(review: Review, threadId: string, body: string): Rev
 export function resolveThread(review: Review, threadId: string, resolved: boolean): Review {
   const index = review.threads.findIndex((thread) => thread.id === threadId);
   if (index === -1) throw new ReviewError(404, `No thread with id ${threadId}.`);
-  if (resolved && review.runs.some((run) => run.state === "running" && run.threadIds.includes(threadId))) {
+  if (resolved && review.runs.some((run) => (run.state === "running" || run.state === "queued") && run.threadIds.includes(threadId))) {
     throw new ReviewError(409, "This thread is part of a run in progress.");
   }
   const thread = review.threads[index];

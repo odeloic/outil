@@ -232,19 +232,16 @@ describe("addFollowUp", () => {
     }
   });
 
-  it("throws a 409 ReviewError when the thread is waiting for a reply", () => {
+  it("allows a follow-up while the thread is waiting for a reply", () => {
     let review = createThread(emptyReview(), anchor, "one");
     review = {
       ...review,
       threads: review.threads.map((t) => ({ ...t, messages: t.messages.map((m) => ({ ...m, state: "sent" as const })) })),
     };
 
-    expect(() => addFollowUp(review, "t1", "x")).toThrow(ReviewError);
-    try {
-      addFollowUp(review, "t1", "x");
-    } catch (err) {
-      expect((err as ReviewError).status).toBe(409);
-    }
+    const next = addFollowUp(review, "t1", "x");
+    expect(next.threads[0].messages.map((m) => m.body)).toEqual(["one", "x"]);
+    expect(next.threads[0].messages[1]).toMatchObject({ author: "reviewer", state: "draft" });
   });
 
   it("does not mutate the original review", () => {
@@ -308,6 +305,18 @@ describe("resolveThread", () => {
   it("throws a 409 ReviewError when resolving a thread that is part of a running run", () => {
     let review = createThread(emptyReview(), anchor, "one");
     review = { ...review, runs: [runningRun(["t1"])] };
+
+    expect(() => resolveThread(review, "t1", true)).toThrow(ReviewError);
+    try {
+      resolveThread(review, "t1", true);
+    } catch (err) {
+      expect((err as ReviewError).status).toBe(409);
+    }
+  });
+
+  it("throws a 409 ReviewError when resolving a thread that is part of a queued run", () => {
+    let review = createThread(emptyReview(), anchor, "one");
+    review = { ...review, runs: [{ ...runningRun(["t1"]), state: "queued" }] };
 
     expect(() => resolveThread(review, "t1", true)).toThrow(ReviewError);
     try {

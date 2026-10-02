@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { mkdir, open, readFile, rename, rm, stat, unlink, utimes } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
-import type { Review, ReviewTarget, Run, Thread, ThreadAnchor, ThreadMessage } from "../shared/api.ts";
+import type { Review, ReviewTarget, Run, RunErrorKind, RunState, Thread, ThreadAnchor, ThreadMessage } from "../shared/api.ts";
 import { emptyReview, enqueue, type ResolveTarget, type ReviewStore, type TargetResolution } from "./reviews.ts";
 
 const exec = promisify(execFile);
@@ -12,7 +12,16 @@ const LOCK_RETRY_MS = 30;
 const LOCK_STALE_MS = 5000;
 const LINE_SIDES = new Set(["old", "new"]);
 const AGENT_IDS = new Set(["claude", "codex"]);
-const RUN_STATES = new Set(["running", "done", "failed", "timed-out", "cancelled", "interrupted"]);
+const RUN_STATE_FLAGS: Record<RunState, true> = {
+  queued: true,
+  running: true,
+  done: true,
+  failed: true,
+  "timed-out": true,
+  cancelled: true,
+  interrupted: true,
+};
+const RUN_STATES = new Set<string>(Object.keys(RUN_STATE_FLAGS));
 
 async function gitCommonDir(repoRoot: string): Promise<string> {
   const { stdout } = await exec("git", ["rev-parse", "--git-common-dir"], { cwd: repoRoot });
@@ -73,7 +82,13 @@ function isThread(value: unknown): value is Thread {
   );
 }
 
-const RUN_ERROR_KINDS = new Set<string>(["missing", "agent", "invalid"]);
+const RUN_ERROR_KIND_FLAGS: Record<RunErrorKind, true> = { missing: true, agent: true, invalid: true, "rate-limit": true };
+const RUN_ERROR_KINDS = new Set<string>(Object.keys(RUN_ERROR_KIND_FLAGS));
+
+function isReplyAfter(value: unknown): value is Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  return Object.values(value).every((id) => typeof id === "string");
+}
 
 function isRunOwner(value: unknown): value is Run["owner"] {
   if (value === null || value === undefined) return true;
@@ -97,11 +112,10 @@ function isRun(value: unknown): value is Run {
 }
 
 function normalizeRun(run: Run): Run {
-  const withEffort = typeof run.effort === "string" ? run : { ...run, effort: null };
-  if (withEffort.errorKind === undefined || RUN_ERROR_KINDS.has(withEffort.errorKind)) return withEffort;
-  const known = { ...withEffort };
-  delete known.errorKind;
-  return known;
+  const normalized: Run = typeof run.effort === "string" ? { ...run } : { ...run, effort: null };
+  if (normalized.errorKind !== undefined && !RUN_ERROR_KINDS.has(normalized.errorKind)) delete normalized.errorKind;
+  if (normalized.replyAfter !== undefined && !isReplyAfter(normalized.replyAfter)) delete normalized.replyAfter;
+  return normalized;
 }
 
 type FileStat = { mtimeMs: number; size: number; ino: number };

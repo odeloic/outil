@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReviewTarget } from "../shared/api.ts";
+import type { ReviewTarget, Run } from "../shared/api.ts";
 import { assertCommits, compareCommits, getCommit } from "./git.ts";
 import { createFileStore } from "./reviewFiles.ts";
 import { addFollowUp, createTargetResolver, createThread, type ResolveTarget } from "./reviews.ts";
@@ -297,6 +297,49 @@ describe("createFileStore", () => {
     expect(review.runs).toHaveLength(1);
     expect(review.runs[0]).not.toHaveProperty("errorKind");
     expect(readdirSync(reviewsDir).some((f) => f.includes(".corrupt-"))).toBe(false);
+  });
+
+  describe("run round-trips", () => {
+    const baseRun = { id: "r1", agent: "claude" as const, model: "haiku", effort: null, threadIds: ["t1"], startedAt: "x", endedAt: null, summary: null, error: null, owner: null };
+
+    async function roundTrip(runs: Run[]) {
+      const { dir, commit } = makeRepo();
+      const sha = commit("one");
+      const store = createFileStore(dir, resolverFor(dir));
+      const target = { kind: "commit" as const, sha };
+      await store.update(target, (review) => ({ ...review, runs }));
+      const read = await createFileStore(dir, resolverFor(dir)).get(target);
+      const commonDir = execFileSync("git", ["-C", dir, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
+      const files = readdirSync(join(dir, commonDir, "outil", "reviews"));
+      return { read, files };
+    }
+
+    it("keeps a queued run", async () => {
+      const runs: Run[] = [{ ...baseRun, state: "queued" }];
+      const { read, files } = await roundTrip(runs);
+      expect(read.runs).toEqual(runs);
+      expect(files.some((f) => f.includes(".corrupt-"))).toBe(false);
+    });
+
+    it("keeps a rate-limit errorKind", async () => {
+      const runs: Run[] = [{ ...baseRun, state: "failed", error: "429", endedAt: "y", errorKind: "rate-limit" }];
+      expect((await roundTrip(runs)).read.runs).toEqual(runs);
+    });
+
+    it("keeps replyAfter", async () => {
+      const runs: Run[] = [{ ...baseRun, state: "running", replyAfter: { t1: "m1" } }];
+      expect((await roundTrip(runs)).read.runs).toEqual(runs);
+    });
+
+    it("drops a malformed replyAfter without discarding the file", async () => {
+      for (const replyAfter of [{ t1: 3 }, ["m1"], "m1", null]) {
+        const runs = [{ ...baseRun, state: "running", replyAfter }] as unknown as Run[];
+        const { read, files } = await roundTrip(runs);
+        expect(read.runs).toHaveLength(1);
+        expect(read.runs[0]).not.toHaveProperty("replyAfter");
+        expect(files.some((f) => f.includes(".corrupt-"))).toBe(false);
+      }
+    });
   });
 
   it("reads a run saved before efforts existed as having no effort", async () => {

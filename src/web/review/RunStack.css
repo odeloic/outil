@@ -61,3 +61,23 @@
 .run-stack__state--queued {
   color: var(--ods-fg-2);
 }
+
+.run-stack__threads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ods-space-2) var(--ods-space-4);
+}
+
+.run-stack__location {
+  font-family: var(--ods-font-mono);
+  font-size: var(--ods-text-xs);
+}
+
+.run-stack__more {
+  color: var(--ods-fg-2);
+  font-size: var(--ods-text-xs);
+}

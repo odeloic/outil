@@ -64,12 +64,14 @@ function SendPanel({
   runs,
   send,
   cancel,
+  onJump,
 }: {
   threads: Thread[]
   drafts: number
   runs: Run[]
   send: (agent: AgentId, model: string, effort: string | null, threadIds?: string[]) => Promise<ReviewData>
   cancel: (runId: string) => Promise<ReviewData>
+  onJump: (thread: Thread) => void
 }) {
   const { agent, agents, model, effort, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
   const [open, setOpen] = useState(false)
@@ -286,7 +288,15 @@ function SendPanel({
               )}
             </div>
           )}
-          <RunStack runs={runs} onCancel={cancel} />
+          <RunStack
+            runs={runs}
+            threads={threads}
+            onCancel={cancel}
+            onJump={(thread) => {
+              setOpen(false)
+              onJump(thread)
+            }}
+          />
         </div>
       )}
     </div>
@@ -405,7 +415,7 @@ export function Review({
   return (
     <SendNowProvider send={sendWithThreads}>
       <TopBar>
-        <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
+        <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} onJump={goToThread} />
       </TopBar>
       <div className="review">
         <aside className="review__rail">

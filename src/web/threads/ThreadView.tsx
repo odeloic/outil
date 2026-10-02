@@ -63,7 +63,7 @@ export function ThreadView({
   const seenLongEnough = useVisibleFor(cardRef, 1000, unread)
   const markedIdRef = useRef<string | null>(null)
   const isNewDraftThread = status === 'draft' && thread.messages.length === 1
-  const canReply = status === 'answered' || status === 'sent'
+  const canReply = status !== 'draft' && status !== 'resolved'
   const inActiveRun = runs.some((run) => (run.state === 'queued' || run.state === 'running') && run.threadIds.includes(thread.id))
   const { reason: sendNowReason, errors: sendNowErrors, sendNow } = useSendNow()
   const sendNowError = sendNowErrors[thread.id] ?? null

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { FileDiff, LineSide, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
+import type { FileDiff, LineSide, Review, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { Button } from '../design-system'
 import { BodyNote } from './BodyNote.tsx'
 import { useDisplaySettings } from '../settings.ts'
@@ -27,7 +27,7 @@ type Props = {
   threads: Thread[]
   runs: Run[]
   reviewerInitials: string
-  onCreateThread: (anchor: ThreadAnchor, body: string) => Promise<unknown>
+  onCreateThread: (anchor: ThreadAnchor, body: string) => Promise<Review>
   onEditDraft: (id: string, body: string) => Promise<unknown>
   onDeleteDraft: (id: string) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>

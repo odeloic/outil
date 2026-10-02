@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentMessage, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
+import type { AgentMessage, Review, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
 import { threadStatus } from '../../shared/review.ts'
 import { AgentLabel } from '../agents/AgentLabel.tsx'
@@ -8,6 +8,7 @@ import { Avatar, Button, Note, StatusChip } from '../design-system'
 import { threadCardId } from '../review/navigation.ts'
 import { anchorLabel } from './anchorLabel.ts'
 import { Composer } from './Composer.tsx'
+import { newThreadId, useSendNow } from './useSendNow.ts'
 import { MessageBody } from './MessageBody.tsx'
 import { useVisibleFor } from './useVisibleFor.ts'
 import './Threads.css'
@@ -63,7 +64,9 @@ export function ThreadView({
   const markedIdRef = useRef<string | null>(null)
   const isNewDraftThread = status === 'draft' && thread.messages.length === 1
   const canReply = status === 'answered'
-  const inRunningRun = runs.some((run) => run.state === 'running' && run.threadIds.includes(thread.id))
+  const inActiveRun = runs.some((run) => (run.state === 'queued' || run.state === 'running') && run.threadIds.includes(thread.id))
+  const { reason: sendNowReason, errors: sendNowErrors, sendNow } = useSendNow()
+  const sendNowError = sendNowErrors[thread.id] ?? null
   const [replyState, setReplyState] = useState<{ canReply: boolean; replying: boolean }>({ canReply, replying: false })
   if (replyState.canReply !== canReply) setReplyState({ canReply, replying: false })
   const replying = replyState.replying
@@ -84,6 +87,12 @@ export function ThreadView({
     onReply(thread.id, body).then((result) => {
       setReplying(false)
       setPendingFocus('draft-edit')
+      return result
+    })
+
+  const handleReplySendNow = (body: string) =>
+    handleReplySave(body).then((result) => {
+      sendNow(thread.id)
       return result
     })
 
@@ -168,9 +177,9 @@ export function ThreadView({
             <Button
               variant="ghost"
               onClick={() => handleResolve(true)}
-              disabled={resolving || inRunningRun}
+              disabled={resolving || inActiveRun}
               aria-label={`Resolve thread on ${label}`}
-              title={inRunningRun ? 'Wait for the run to finish before resolving.' : undefined}
+              title={inActiveRun ? 'Wait for the run to finish before resolving.' : undefined}
             >
               {resolving ? 'Resolving…' : 'Resolve'}
             </Button>
@@ -215,12 +224,13 @@ export function ThreadView({
         ),
       )}
       {deleteError && <Note variant="failure">{deleteError}</Note>}
+      {sendNowError && <Note variant="failure">{sendNowError}</Note>}
       {canReply &&
         !thread.resolved &&
         (replying ? (
           <div className="thread-card__draft-card">
             <span className="thread-card__draft-title">New reply</span>
-            <Composer onSave={handleReplySave} onCancel={handleReplyCancel} ariaLabel={`Reply on ${label}`} hint />
+            <Composer onSave={handleReplySave} onSendNow={handleReplySendNow} sendNowReason={sendNowReason} onCancel={handleReplyCancel} ariaLabel={`Reply on ${label}`} hint />
           </div>
         ) : (
           <Button className="thread-card__reply-button" variant="ghost" onClick={() => setReplying(true)} aria-label={`Reply on ${label}`}>
@@ -233,12 +243,19 @@ export function ThreadView({
 
 type PendingProps = {
   anchor: Pick<ThreadAnchor, 'side' | 'startLine' | 'endLine'>
-  onSave: (body: string) => Promise<unknown>
+  onSave: (body: string) => Promise<Review>
   onCancel: () => void
 }
 
 export function PendingThreadCard({ anchor, onSave, onCancel }: PendingProps) {
   const label = anchorLabel(anchor)
+  const { reason: sendNowReason, sendNow } = useSendNow()
+  const handleSendNow = (body: string) =>
+    onSave(body).then((review) => {
+      const id = newThreadId(review)
+      if (id) sendNow(id)
+      return review
+    })
   return (
     <div className="thread-card thread-card--draft">
       <div className="thread-card__header">
@@ -247,7 +264,7 @@ export function PendingThreadCard({ anchor, onSave, onCancel }: PendingProps) {
           {label.slice(1)}
         </span>
       </div>
-      <Composer onSave={onSave} onCancel={onCancel} ariaLabel={`Comment on ${label}`} hint />
+      <Composer onSave={onSave} onSendNow={handleSendNow} sendNowReason={sendNowReason} onCancel={onCancel} ariaLabel={`Comment on ${label}`} hint />
     </div>
   )
 }

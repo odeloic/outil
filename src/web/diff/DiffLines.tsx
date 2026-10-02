@@ -1,5 +1,5 @@
 import { Fragment, memo, useEffect, useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
-import type { LineSide, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
+import type { LineSide, Review, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { Button, Icon } from '../design-system'
 import { PendingThreadCard, ThreadView } from '../threads/ThreadView.tsx'
 import type { HeightStore } from './heightStore.ts'
@@ -19,7 +19,7 @@ export type RowExtra =
 
 export type RowExtras = ReadonlyMap<number, RowExtra[]>
 
-export type PendingComposer = { onSave: (body: string) => Promise<unknown>; onCancel: () => void }
+export type PendingComposer = { onSave: (body: string) => Promise<Review>; onCancel: () => void }
 
 export type ThreadHandlers = {
   reviewerInitials: string

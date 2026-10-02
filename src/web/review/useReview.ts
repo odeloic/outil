@@ -27,7 +27,7 @@ export type UseReview = {
   deleteDraft: (id: string) => Promise<Review>
   addFollowUp: (threadId: string, body: string) => Promise<Review>
   resolveThread: (threadId: string, resolved: boolean) => Promise<Review>
-  send: (agent: AgentId, model: string, effort: string | null) => Promise<Review>
+  send: (agent: AgentId, model: string, effort: string | null, threadIds?: string[]) => Promise<Review>
   cancel: (runId: string) => Promise<Review>
   markRead: (threadId: string) => Promise<Review>
 }
@@ -93,7 +93,7 @@ export function useReview(target: ReviewTarget): UseReview {
       }
       applyResponse(dispatchKey, review)
       for (const run of review.runs) {
-        if (run.state !== 'running') clearRunActivity(run.id)
+        if (run.state !== 'running' && run.state !== 'queued') clearRunActivity(run.id)
       }
     }
 
@@ -209,8 +209,8 @@ export function useReview(target: ReviewTarget): UseReview {
   )
 
   const send = useCallback(
-    (agent: AgentId, model: string, effort: string | null) =>
-      applyMutation(unwrap(client.api.review.send.$post({ json: { target: targetRef.current, agent, model, effort } }))),
+    (agent: AgentId, model: string, effort: string | null, threadIds?: string[]) =>
+      applyMutation(unwrap(client.api.review.send.$post({ json: { target: targetRef.current, agent, model, effort, ...(threadIds ? { threadIds } : {}) } }))),
     [applyMutation],
   )
 

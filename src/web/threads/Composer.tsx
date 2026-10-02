@@ -4,30 +4,37 @@ import { Button, Kbd, Note, TextArea } from '../design-system'
 type Props = {
   initialBody?: string
   onSave: (body: string) => Promise<unknown>
+  onSendNow?: (body: string) => Promise<unknown>
+  sendNowReason?: string | null
   onCancel: () => void
   autoFocus?: boolean
   ariaLabel: string
   hint?: boolean
 }
 
-export function Composer({ initialBody = '', onSave, onCancel, autoFocus = true, ariaLabel, hint = false }: Props) {
+export function Composer({ initialBody = '', onSave, onSendNow, sendNowReason = null, onCancel, autoFocus = true, ariaLabel, hint = false }: Props) {
   const [value, setValue] = useState(initialBody)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const savingRef = useRef(false)
 
-  const save = () => {
+  const submit = (action: (body: string) => Promise<unknown>) => {
     if (savingRef.current) return
     const trimmed = value.trim()
     if (trimmed === '') return
     savingRef.current = true
     setSaving(true)
     setError(null)
-    onSave(trimmed).catch((err: Error) => {
+    action(trimmed).catch((err: Error) => {
       savingRef.current = false
       setSaving(false)
       setError(err.message)
     })
+  }
+
+  const save = () => submit(onSave)
+  const sendNow = () => {
+    if (onSendNow) submit(onSendNow)
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -61,6 +68,16 @@ export function Composer({ initialBody = '', onSave, onCancel, autoFocus = true,
           {saving ? 'Saving…' : 'Save draft'}
           <Kbd>⌘↵</Kbd>
         </Button>
+        {onSendNow && (
+          <Button
+            variant="default"
+            onClick={sendNow}
+            disabled={saving || value.trim() === '' || sendNowReason !== null}
+            title={sendNowReason ?? 'Saves this draft and sends this thread to the agent now.'}
+          >
+            Send now
+          </Button>
+        )}
         <Button variant="ghost" onClick={onCancel} disabled={saving}>
           Cancel
           <Kbd>Esc</Kbd>

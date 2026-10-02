@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import type { FileChange, FileDiff, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
+import type { FileChange, Review, FileDiff, Run, Thread, ThreadAnchor } from '../../shared/api.ts'
 import { client, unwrap } from '../api.ts'
 import { Button, Checkbox, CountBadge, DiffStat, FileStatusBadge, Icon, Spinner, Tag } from '../design-system'
 import { FILE_STATUS_BADGE } from '../fileStatus.ts'
@@ -16,7 +16,7 @@ type CommentProps = {
   threads: Thread[]
   runs: Run[]
   reviewerInitials: string
-  onCreateThread: (anchor: ThreadAnchor, body: string) => Promise<unknown>
+  onCreateThread: (anchor: ThreadAnchor, body: string) => Promise<Review>
   onEditDraft: (id: string, body: string) => Promise<unknown>
   onDeleteDraft: (id: string) => Promise<unknown>
   onReply: (threadId: string, body: string) => Promise<unknown>

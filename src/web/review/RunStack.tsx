@@ -1,13 +1,15 @@
+import { useState } from 'react'
 import type { Run } from '../../shared/api.ts'
 import { AGENT_NAMES } from '../../shared/agents.ts'
 import { AgentLabel } from '../agents/AgentLabel.tsx'
-import { Icon, ProgressBar, type IconName } from '../design-system'
+import { Button, Icon, Note, ProgressBar, type IconName } from '../design-system'
 import { relativeTime } from '../format.ts'
 import { MessageBody } from '../threads/MessageBody.tsx'
 import { RunProgress } from './RunProgress.tsx'
 import './RunStack.css'
 
 const STATE_ICON: Record<Run['state'], IconName> = {
+  queued: 'loading',
   running: 'loading',
   done: 'check',
   cancelled: 'warning',
@@ -17,12 +19,38 @@ const STATE_ICON: Record<Run['state'], IconName> = {
 }
 
 const STATE_LABEL: Record<Run['state'], string> = {
+  queued: 'Queued',
   running: 'Reviewing',
   done: 'Done',
   cancelled: 'Cancelled',
   failed: 'Failed',
   'timed-out': 'Timed out',
   interrupted: 'Interrupted',
+}
+
+function QueuedRun({ run, onCancel }: { run: Run; onCancel: (runId: string) => Promise<unknown> }) {
+  const [cancelling, setCancelling] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const threadCount = run.threadIds.length
+  const handleCancel = () => {
+    setCancelling(true)
+    setError(null)
+    onCancel(run.id)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setCancelling(false))
+  }
+  return (
+    <>
+      <p className="run-stack__state run-stack__state--queued">
+        <Icon name={STATE_ICON.queued} />
+        {STATE_LABEL.queued} · {threadCount} {threadCount === 1 ? 'thread' : 'threads'}
+        <Button variant="ghost" onClick={handleCancel} disabled={cancelling}>
+          {cancelling ? 'Cancelling…' : 'Cancel'}
+        </Button>
+      </p>
+      {error && <Note variant="failure">{error}</Note>}
+    </>
+  )
 }
 
 function RunItem({ run, onCancel }: { run: Run; onCancel: (runId: string) => Promise<unknown> }) {
@@ -35,7 +63,9 @@ function RunItem({ run, onCancel }: { run: Run; onCancel: (runId: string) => Pro
           {relativeTime(when)}
         </time>
       </div>
-      {run.state === 'running' ? (
+      {run.state === 'queued' ? (
+        <QueuedRun run={run} onCancel={onCancel} />
+      ) : run.state === 'running' ? (
         <>
           <RunProgress run={run} onCancel={() => onCancel(run.id)} />
           <ProgressBar indeterminate label={`${AGENT_NAMES[run.agent]} is reviewing`} />

@@ -57,3 +57,7 @@
   background: none;
   border: 0;
 }
+
+.run-stack__state--queued {
+  color: var(--ods-fg-2);
+}

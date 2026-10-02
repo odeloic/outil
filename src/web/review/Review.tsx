@@ -19,6 +19,7 @@ import { adjacentOpenThread, focusThread, jumpToFile, orderOpenThreads, resetNav
 import { RunEndNote } from './RunEndNote.tsx'
 import { followNotReadyWatch, type NotReadyWatch } from './sendError.ts'
 import { RunStack } from './RunStack.tsx'
+import { SendNowProvider } from '../threads/SendNowProvider.tsx'
 import { createSendShortcut } from './sendShortcut.ts'
 import { useDismiss } from './useDismiss.ts'
 import { ThemePill } from './ThemePill.tsx'
@@ -67,7 +68,7 @@ function SendPanel({
   threads: Thread[]
   drafts: number
   runs: Run[]
-  send: (agent: AgentId, model: string, effort: string | null) => Promise<ReviewData>
+  send: (agent: AgentId, model: string, effort: string | null, threadIds?: string[]) => Promise<ReviewData>
   cancel: (runId: string) => Promise<ReviewData>
 }) {
   const { agent, agents, model, effort, agentsLoading, recheckAgents, modelsLoading, modelsError, stored } = useAgentChoice()
@@ -92,7 +93,6 @@ function SendPanel({
   } else if (followed.watch !== notReadyWatch) {
     setNotReadyWatch(followed.watch)
   }
-  const runningRun = runs.find((run) => run.state === 'running') ?? null
   const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
   const noReplyCount = threads.filter((thread) => threadStatus(thread, runs) === 'failed').length
 
@@ -104,9 +104,7 @@ function SendPanel({
         ? modelsError
         : drafts === 0
           ? 'No drafts to send.'
-          : runningRun
-            ? 'Waiting for the agent…'
-            : null
+          : null
 
   const canSend = reason === null && agent !== null && model !== null
 
@@ -255,7 +253,7 @@ function SendPanel({
           )}
           {(shownReason || sendError || latestEndNote || (drafts > 0 && noReplyCount > 0)) && (
             <div className="review__send-popover-notes">
-              {!runningRun && shownReason && <p className="review__send-reason">{shownReason}</p>}
+              {shownReason && <p className="review__send-reason">{shownReason}</p>}
               {drafts > 0 && noReplyCount > 0 && (
                 <p className="review__send-reason">
                   Also re-sends {noReplyCount} {noReplyCount === 1 ? 'thread' : 'threads'} with no reply.
@@ -327,6 +325,10 @@ export function Review({
   const current = useCurrentFile(changes.files.length)
   const { review, error, reviewer, createThread, editDraft, deleteDraft, addFollowUp, resolveThread, send, cancel, markRead } =
     useReview(reviewTarget)
+  const sendWithThreads = useCallback(
+    (agent: AgentId, model: string, effort: string | null, threadIds: string[]) => send(agent, model, effort, threadIds),
+    [send],
+  )
   const reviewerInitials = useMemo(() => initials(reviewer), [reviewer])
   const threadsByPath = useMemo(() => {
     const map = new Map<string, Thread[]>()
@@ -401,7 +403,7 @@ export function Review({
   }
 
   return (
-    <>
+    <SendNowProvider send={sendWithThreads}>
       <TopBar>
         <SendPanel threads={review?.threads ?? NO_THREADS} drafts={drafts} runs={runs} send={send} cancel={cancel} />
       </TopBar>
@@ -469,6 +471,6 @@ export function Review({
         </main>
       </div>
       <ThemePill />
-    </>
+    </SendNowProvider>
   )
 }

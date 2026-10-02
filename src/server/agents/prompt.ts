@@ -133,6 +133,7 @@ const CONTRACT = [
   'Do not answer threads that are not marked "Needs a reply.".',
   "Replies should be actionable review feedback about the code the thread is anchored to.",
   "Also include a short overall summary of the review.",
+  "In the summary, refer to threads by file and line, never by thread id.",
 ].join("\n");
 
 const REMINDER = 'Reminder: reply once to every thread marked "Needs a reply." above, keyed by its id, plus a short summary.';

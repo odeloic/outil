@@ -99,6 +99,11 @@ describe("buildPrompt", () => {
     expect(sectionOf(second, "t1")).not.toContain("Needs a reply.");
   });
 
+  it("tells the agent to refer to threads by file and line in the summary, not by id", () => {
+    const prompt = buildPrompt(review(), emptyContext, { threadIds: ["t1"] });
+    expect(prompt).toContain("In the summary, refer to threads by file and line, never by thread id.");
+  });
+
   it("labels agent messages with the agent and model", () => {
     const r = review({
       threads: [

@@ -100,7 +100,7 @@ function RunItem({ run, threads, onCancel, onJump }: RunItemProps) {
             <Icon name={STATE_ICON[run.state]} />
             {STATE_LABEL[run.state]}
           </p>
-          {run.state === 'done' && run.summary && (
+          {run.state === 'done' && run.summary && run.threadIds.length !== 1 && (
             <div className="run-stack__summary">
               <MessageBody body={run.summary} />
             </div>

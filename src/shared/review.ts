@@ -8,7 +8,7 @@ export function threadStatus(thread: Thread, runs: Run[]): ThreadStatus {
   if (!last) return "resolved"
   if (last.author === "reviewer" && last.state === "draft") return "draft"
   if (last.author === "agent") return "answered"
-  const waiting = runs.some((run) => run.state === "running" && run.threadIds.includes(thread.id))
+  const waiting = runs.some((run) => (run.state === "queued" || run.state === "running") && run.threadIds.includes(thread.id))
   return waiting ? "sent" : "failed"
 }
 

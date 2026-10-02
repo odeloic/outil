@@ -67,6 +67,11 @@ describe("threadStatus", () => {
     expect(threadStatus(t, [run({ state: "running", threadIds: ["t1"] })])).toBe("sent")
   })
 
+  it("is sent when a queued run holds the thread", () => {
+    const t = thread({ id: "t1", messages: [reviewerMessage({ state: "sent" })] })
+    expect(threadStatus(t, [run({ state: "queued", threadIds: ["t1"] })])).toBe("sent")
+  })
+
   it("is failed when the last message is sent but no run is running for it", () => {
     const t = thread({ id: "t1", messages: [reviewerMessage({ state: "sent" })] })
     expect(threadStatus(t, [])).toBe("failed")

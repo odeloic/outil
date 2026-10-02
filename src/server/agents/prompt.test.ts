@@ -59,7 +59,7 @@ const emptyContext: PromptContext = { headSubject: "Add the thing", snippets: ne
 
 describe("buildPrompt", () => {
   it("headers a commit review with its sha and subject", () => {
-    const prompt = buildPrompt(review(), emptyContext);
+    const prompt = buildPrompt(review(), emptyContext, { threadIds: ["t1"] });
     expect(prompt).toContain(`Reviewing commit ${sha} "Add the thing".`);
     expect(prompt).toContain("Do not modify any file.");
     expect(prompt).toContain(`read-only snapshot of commit ${sha}.`);
@@ -68,19 +68,35 @@ describe("buildPrompt", () => {
 
   it("headers a compare review with its base and head", () => {
     const target = { kind: "compare" as const, base, head: sha };
-    const prompt = buildPrompt(review({ target }), emptyContext);
+    const prompt = buildPrompt(review({ target }), emptyContext, { threadIds: ["t1"] });
     expect(prompt).toContain(`Reviewing changes from ${base} to ${sha}.`);
   });
 
   it("omits the old-side note when there is no base", () => {
-    const prompt = buildPrompt(review({ base: null }), emptyContext);
+    const prompt = buildPrompt(review({ base: null }), emptyContext, { threadIds: ["t1"] });
     expect(prompt).not.toContain("old side of the diff");
   });
 
   it("writes a block per thread with its id, anchor, and message history", () => {
-    const prompt = buildPrompt(review(), emptyContext);
+    const prompt = buildPrompt(review(), emptyContext, { threadIds: ["t1"] });
     expect(prompt).toContain("Thread t1 — src/a.ts, new line(s) 10-10");
     expect(prompt).toContain("Reviewer: What does this do?");
+  });
+
+  it("marks only the threads of the run being started, even with two running runs", () => {
+    const r = review({
+      threads: [thread({ id: "t1" }), thread({ id: "t2", anchor: { path: "src/b.ts", side: "new", startLine: 2, endLine: 2 } })],
+      runs: [runningRun({ id: "r1", threadIds: ["t1"] }), runningRun({ id: "r2", threadIds: ["t2"] })],
+    });
+
+    const sectionOf = (prompt: string, id: string) => prompt.split("\n\n").find((s) => s.startsWith(`Thread ${id}`))!;
+    const first = buildPrompt(r, emptyContext, r.runs[0]);
+    const second = buildPrompt(r, emptyContext, r.runs[1]);
+
+    expect(sectionOf(first, "t1")).toContain("Needs a reply.");
+    expect(sectionOf(first, "t2")).not.toContain("Needs a reply.");
+    expect(sectionOf(second, "t2")).toContain("Needs a reply.");
+    expect(sectionOf(second, "t1")).not.toContain("Needs a reply.");
   });
 
   it("labels agent messages with the agent and model", () => {
@@ -94,7 +110,7 @@ describe("buildPrompt", () => {
         }),
       ],
     });
-    const prompt = buildPrompt(r, emptyContext);
+    const prompt = buildPrompt(r, emptyContext, { threadIds: ["t1"] });
     expect(prompt).toContain("Agent (claude · haiku): Because X.");
   });
 
@@ -120,7 +136,7 @@ describe("buildPrompt", () => {
       runs: [runningRun({ agent: "codex", model: "gpt-5.6-luna", threadIds: ["t1"] })],
     });
 
-    const prompt = buildPrompt(r, emptyContext);
+    const prompt = buildPrompt(r, emptyContext, { threadIds: ["t1"] });
     const sections = prompt.split("\n\n");
     const t1Section = sections.find((s) => s.startsWith("Thread t1"))!;
     const t2Section = sections.find((s) => s.startsWith("Thread t2"))!;
@@ -147,7 +163,7 @@ describe("buildPrompt", () => {
         ],
       ]),
     };
-    const prompt = buildPrompt(review(), context);
+    const prompt = buildPrompt(review(), context, { threadIds: ["t1"] });
     expect(prompt).toContain("> 10: the line");
     expect(prompt).toContain("  9: before");
   });
@@ -157,7 +173,7 @@ describe("buildPrompt", () => {
       threads: [thread({ id: "t1" }), thread({ id: "t2" })],
       runs: [runningRun({ threadIds: ["t1"] })],
     });
-    const prompt = buildPrompt(r, emptyContext);
+    const prompt = buildPrompt(r, emptyContext, { threadIds: ["t1"] });
     const sections = prompt.split("\n\n");
     const t1Section = sections.find((s) => s.startsWith("Thread t1"))!;
     const t2Section = sections.find((s) => s.startsWith("Thread t2"))!;
@@ -170,7 +186,7 @@ describe("buildPrompt", () => {
       threads: [thread({ id: "t1", resolved: true })],
       runs: [runningRun({ threadIds: ["t1"] })],
     });
-    const prompt = buildPrompt(r, emptyContext);
+    const prompt = buildPrompt(r, emptyContext, { threadIds: ["t1"] });
     const sections = prompt.split("\n\n");
     const t1Section = sections.find((s) => s.startsWith("Thread t1"))!;
     expect(t1Section).toContain("(resolved, for context only)");
@@ -178,7 +194,7 @@ describe("buildPrompt", () => {
   });
 
   it("puts the answer contract right after the header, before any thread block, and a short reminder at the end", () => {
-    const prompt = buildPrompt(review(), emptyContext);
+    const prompt = buildPrompt(review(), emptyContext, { threadIds: ["t1"] });
     const contractIndex = prompt.indexOf('Answer every thread marked "Needs a reply."');
     const threadIndex = prompt.indexOf("Thread t1");
     const reminderIndex = prompt.indexOf("Reminder:");
@@ -224,8 +240,8 @@ describe("buildPrompt", () => {
         ]),
       };
 
-      const full = buildPrompt(r, context, Number.MAX_SAFE_INTEGER);
-      const trimmed = buildPrompt(r, context, full.length - 1);
+      const full = buildPrompt(r, context, { threadIds: ["t1"] }, Number.MAX_SAFE_INTEGER);
+      const trimmed = buildPrompt(r, context, { threadIds: ["t1"] }, full.length - 1);
 
       expect(trimmed).toContain("snippet and message history omitted");
       expect(trimmed).not.toContain("t2-snippet-0");
@@ -257,8 +273,8 @@ describe("buildPrompt", () => {
         ]),
       };
 
-      const full = buildPrompt(r, context, Number.MAX_SAFE_INTEGER);
-      const trimmed = buildPrompt(r, context, full.length - 1);
+      const full = buildPrompt(r, context, { threadIds: ["t1"] }, Number.MAX_SAFE_INTEGER);
+      const trimmed = buildPrompt(r, context, { threadIds: ["t1"] }, full.length - 1);
 
       expect(trimmed).toContain("earlier messages omitted");
       expect(trimmed).not.toContain("Older message number 0");
@@ -280,8 +296,8 @@ describe("buildPrompt", () => {
         snippets: new Map([["t1", snippetOf("t1", 300)]]),
       };
 
-      const full = buildPrompt(r, context, Number.MAX_SAFE_INTEGER);
-      const trimmed = buildPrompt(r, context, full.length - 1);
+      const full = buildPrompt(r, context, { threadIds: ["t1"] }, Number.MAX_SAFE_INTEGER);
+      const trimmed = buildPrompt(r, context, { threadIds: ["t1"] }, full.length - 1);
 
       expect(trimmed).toContain("snippet omitted");
       expect(trimmed).not.toContain("t1-snippet-0");
@@ -298,7 +314,7 @@ describe("buildPrompt", () => {
       });
       const context: PromptContext = { headSubject: "x", snippets: new Map([["t1", snippetOf("t1", 300)]]) };
 
-      const trimmed = buildPrompt(r, context, 10);
+      const trimmed = buildPrompt(r, context, { threadIds: ["t1"] }, 10);
 
       expect(trimmed).toContain('Answer every thread marked "Needs a reply."');
       expect(trimmed).toContain("Reminder:");

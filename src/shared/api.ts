@@ -166,14 +166,14 @@ export type Thread = {
   createdAt: string
 }
 
-export type RunState = "running" | "done" | "failed" | "timed-out" | "cancelled" | "interrupted"
+export type RunState = "queued" | "running" | "done" | "failed" | "timed-out" | "cancelled" | "interrupted"
 
 export type RunOwner = {
   pid: number
   instance: string
 }
 
-export type RunErrorKind = "missing" | "agent" | "invalid"
+export type RunErrorKind = "missing" | "agent" | "invalid" | "rate-limit"
 
 export type Run = {
   id: string
@@ -182,6 +182,7 @@ export type Run = {
   effort: string | null
   state: RunState
   threadIds: string[]
+  replyAfter?: Record<string, string>
   startedAt: string
   endedAt: string | null
   summary: string | null

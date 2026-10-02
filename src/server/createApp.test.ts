@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentRunError } from "./agents/errors.ts";
-import { isAgentMissingError, parseAgentTimeoutMs } from "./createApp.ts";
+import { isAgentMissingError, parseAgentTimeoutMs, parseMaxRuns } from "./createApp.ts";
 
 describe("parseAgentTimeoutMs", () => {
   it("reads a positive integer from OUTIL_AGENT_TIMEOUT_MS", () => {
@@ -14,6 +14,22 @@ describe("parseAgentTimeoutMs", () => {
   it("falls back to the default for a non-numeric, zero, negative, or fractional value", () => {
     for (const value of ["nope", "0", "-100", "1.5", ""]) {
       expect(parseAgentTimeoutMs({ OUTIL_AGENT_TIMEOUT_MS: value })).toBeUndefined();
+    }
+  });
+});
+
+describe("parseMaxRuns", () => {
+  it("reads a positive integer from OUTIL_MAX_RUNS", () => {
+    expect(parseMaxRuns({ OUTIL_MAX_RUNS: "4" })).toBe(4);
+  });
+
+  it("falls back to the default when the variable is missing", () => {
+    expect(parseMaxRuns({})).toBeUndefined();
+  });
+
+  it("falls back to the default for a non-numeric, zero, negative, or fractional value", () => {
+    for (const value of ["nope", "0", "-1", "1.5", ""]) {
+      expect(parseMaxRuns({ OUTIL_MAX_RUNS: value })).toBeUndefined();
     }
   });
 });

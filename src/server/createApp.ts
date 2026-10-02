@@ -34,6 +34,13 @@ export function parseAgentTimeoutMs(env: NodeJS.ProcessEnv): number | undefined 
   return Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
+export function parseMaxRuns(env: NodeJS.ProcessEnv): number | undefined {
+  const raw = env.OUTIL_MAX_RUNS;
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 export function isAgentMissingError(err: unknown): boolean {
   return err instanceof AgentRunError && err.kind === "missing";
 }
@@ -67,6 +74,7 @@ export function createApp(cwd: string) {
     listModels: (agent) => modelsCache.list(agent),
     context: (review) => promptContext(cwd, review, boundGetCommit, boundListChanges),
     timeoutMs: parseAgentTimeoutMs(process.env),
+    maxRuns: parseMaxRuns(process.env),
     onChange: () => {},
     onActivity: (key, runId, text) => publishActivity(key, { runId, text, at: new Date().toISOString() }),
   });
@@ -93,7 +101,7 @@ export function createApp(cwd: string) {
     resolveThread: (target, id, resolved) => store.update(target, (review) => resolveThread(review, id, resolved)),
     detectAgents: (refresh) => agentCache.list(refresh),
     listModels: (agent) => listModels(agent),
-    send: (target, agent, model, effort) => runner.send(target, agent, model, effort),
+    send: (target, agent, model, effort, threadIds) => runner.send(target, agent, model, effort, threadIds),
     cancelRun: (target, id) => runner.cancel(target, id),
     markThreadRead: (target, id) => store.update(target, (review) => markThreadRead(review, id)),
     subscribeEvents: subscribe,

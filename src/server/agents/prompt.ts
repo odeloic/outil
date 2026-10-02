@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ChangeSet, CommitDetails, Review, Thread, ThreadMessage } from "../../shared/api.ts";
+import type { ChangeSet, CommitDetails, Review, Run, Thread, ThreadMessage } from "../../shared/api.ts";
 
 const exec = promisify(execFile);
 
@@ -137,9 +137,8 @@ const CONTRACT = [
 
 const REMINDER = 'Reminder: reply once to every thread marked "Needs a reply." above, keyed by its id, plus a short summary.';
 
-export function buildPrompt(review: Review, context: PromptContext, maxChars = MAX_PROMPT_CHARS): string {
-  const runningRun = review.runs.find((run) => run.state === "running");
-  const needsReplySet = new Set(runningRun?.threadIds ?? []);
+export function buildPrompt(review: Review, context: PromptContext, run: Pick<Run, "threadIds">, maxChars = MAX_PROMPT_CHARS): string {
+  const needsReplySet = new Set(run.threadIds);
   const header = buildHeader(review, context);
 
   const render = (stage: TrimStage): string => {

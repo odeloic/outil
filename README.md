@@ -83,6 +83,10 @@ Install the agent and sign in, then open the agent picker in the top bar. It sho
 
 Yes. Set `OUTIL_AGENT_TIMEOUT_MS` to a positive number of milliseconds. The default is 10 minutes.
 
+### Can I run several agents at once?
+
+Yes. Use "Send now" on a thread to send it right away. Runs on different threads run concurrently, and extra runs wait in the queue. Set `OUTIL_MAX_RUNS` to a positive integer to change how many runs may run at once per review. The default is 2.
+
 ## Development
 
 ```sh

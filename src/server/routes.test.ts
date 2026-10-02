@@ -771,6 +771,37 @@ describe("POST /api/review/send", () => {
     ]);
   });
 
+  it("passes threadIds through when given and omits them otherwise", async () => {
+    const calls: unknown[] = [];
+    const app = makeApp({
+      send: async (t, _agent, _model, _effort, threadIds) => {
+        calls.push(threadIds);
+        return emptyReview(t);
+      },
+    });
+    for (const threadIds of [["t1", "t2"], undefined]) {
+      const res = await app.request("/api/review/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, agent: "claude", model: "haiku", threadIds }),
+      });
+      expect(res.status).toBe(200);
+    }
+    expect(calls).toEqual([["t1", "t2"], undefined]);
+  });
+
+  it("rejects malformed threadIds", async () => {
+    const app = makeApp({});
+    for (const threadIds of [[], "t1", [1], [""], null]) {
+      const res = await app.request("/api/review/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target, agent: "claude", model: "haiku", threadIds }),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
   it("rejects a malformed effort", async () => {
     const app = makeApp({});
     for (const effort of ["", "--bad", "High", 3, ["low"]]) {
